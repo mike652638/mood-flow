@@ -33,6 +33,11 @@ jobs:
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       R2_BUCKET: ${{ secrets.R2_BUCKET }}
       R2_PUBLIC_BASE: ${{ secrets.R2_PUBLIC_BASE }}
+      # Android signing secrets exposed as env for step conditions
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
     steps:
       - name: Checkout code
@@ -85,7 +90,7 @@ jobs:
           ./gradlew assembleDebug --no-daemon
 
       - name: Prepare signing keys (Release)
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
         run: |
           mkdir -p android/app/keystore
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore/release.keystore
@@ -97,7 +102,7 @@ jobs:
           EOF
 
       - name: Validate Release Keystore & Alias
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
         shell: bash
         run: |
           set -e
@@ -110,7 +115,7 @@ jobs:
           keytool -list -keystore android/app/keystore/release.keystore -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" -alias "${EXPECT_ALIAS}" >/dev/null || { echo "Alias not found or mismatch" >&2; exit 1; }
 
       - name: Build Android Release (APK + AAB)
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
         run: |
           cd android
           chmod +x ./gradlew
@@ -129,7 +134,7 @@ jobs:
         run: node scripts/tag-artifacts.cjs --labels "release,signed,sinternal,store" --product mood-flow
 
       - name: Generate checksums for tagged artifacts (APK/AAB)
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
         shell: bash
         run: |
           set -e
@@ -153,7 +158,7 @@ jobs:
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
 
       - name: Summarize release notes for updates.json
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
         shell: bash
         run: |
           set -e
@@ -167,7 +172,7 @@ jobs:
           fi
 
       - name: Upload Release APK to Cloudflare R2 (store label)
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && env.R2_ACCOUNT_ID != '' && env.R2_ACCESS_KEY_ID != '' && env.R2_SECRET_ACCESS_KEY != '' && env.R2_BUCKET != '' }}
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' && env.R2_ACCOUNT_ID != '' && env.R2_ACCESS_KEY_ID != '' && env.R2_SECRET_ACCESS_KEY != '' && env.R2_BUCKET != '' }}
         shell: bash
         run: |
           set -e
@@ -233,7 +238,7 @@ jobs:
           npx @cyclonedx/cyclonedx-npm --output-file dist/meta/sbom-npm.json --include-dev true
 
       - name: Generate signing metadata (keystore fingerprints)
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
         shell: bash
         run: |
           set -e
@@ -364,7 +369,7 @@ jobs:
           retention-days: 30
 
       - name: Upload Tagged Release APKs
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: android-apk-release-tagged
@@ -379,7 +384,7 @@ jobs:
           retention-days: 30
 
       - name: Upload Tagged Release AABs (all labels)
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: android-aab-release-tagged
@@ -394,7 +399,7 @@ jobs:
           retention-days: 30
 
       - name: Upload Store AAB (for app store submission)
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: android-aab-store-only
