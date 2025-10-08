@@ -1,0 +1,43 @@
+@use './variables' as vars;
+
+@mixin transition($timing: vars.$transition-fast) {
+  transition: all $timing;
+}
+
+@mixin drop-shadow-soft($shadow: vars.$wordcloud-text-shadow) {
+  text-shadow: $shadow;
+}
+
+@mixin unselectable() {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+@mixin tooltip-base($bg: vars.$tooltip-bg, $color: vars.$tooltip-text) {
+  background: $bg;
+  color: $color;
+}
+
+@mixin tooltip-arrow($size: 6px) {
+  width: 0;
+  height: 0;
+  border-left: $size solid transparent;
+  border-right: $size solid transparent;
+  border-top: $size solid vars.$tooltip-bg;
+}
+
+@mixin progress-fill-gradient($from: vars.$progress-from, $to: vars.$progress-to) {
+  background-image: linear-gradient(to right, $from, $to);
+}
+
+@mixin type-scale($key, $line-height: 1.5) {
+  $size: map-get(vars.$type-scale, $key);
+  @if $size == null {
+    @warn "Unknown type scale key: #{$key}";
+  } @else {
+    font-size: $size;
+    line-height: $line-height;
+  }
+}

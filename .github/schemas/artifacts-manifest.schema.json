@@ -1,0 +1,124 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Artifacts Manifest Schema",
+  "type": "object",
+  "required": [
+    "generatedAt",
+    "items",
+    "product",
+    "ci",
+    "git",
+    "generator"
+  ],
+  "properties": {
+    "generatedAt": {
+      "type": "string"
+    },
+    "product": {
+      "type": "string"
+    },
+    "ci": {
+      "type": "object",
+      "properties": {
+        "runNumber": {
+          "type": [
+            "string",
+            "number"
+          ]
+        }
+      },
+      "required": [
+        "runNumber"
+      ]
+    },
+    "git": {
+      "type": "object",
+      "properties": {
+        "shaShort": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "shaShort"
+      ]
+    },
+    "generator": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ]
+    },
+    "signing": {
+      "type": "object",
+      "properties": {
+        "alias": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "sha1": {
+          "type": "string"
+        },
+        "md5": {
+          "type": "string"
+        },
+        "generatedAt": {
+          "type": "string"
+        }
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "file",
+          "ext",
+          "size",
+          "version",
+          "label",
+          "date"
+        ],
+        "properties": {
+          "file": {
+            "type": "string"
+          },
+          "ext": {
+            "type": "string"
+          },
+          "size": {
+            "type": "number"
+          },
+          "version": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "sha1": {
+            "type": "string"
+          },
+          "md5": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

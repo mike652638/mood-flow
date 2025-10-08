@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">心流日记</string>
+    <string name="title_activity_main">心流日记</string>
+    <string name="package_name">host.joyful.moodflow</string>
+    <string name="custom_url_scheme">host.joyful.moodflow</string>
+</resources>
+

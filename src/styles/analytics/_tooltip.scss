@@ -1,0 +1,17 @@
+@use '../mixins' as m;
+@use '../variables' as vars;
+
+.wordcloud-tooltip {
+  @include m.tooltip-base(vars.$tooltip-bg, vars.$tooltip-text);
+  @include m.type-scale(xs, 1.4);
+  @apply px-2 py-1 rounded shadow-lg;
+  position: absolute;
+  z-index: 50;
+}
+
+.tooltip-arrow {
+  @include m.tooltip-arrow();
+  position: absolute;
+  bottom: -6px;
+  left: 12px;
+}

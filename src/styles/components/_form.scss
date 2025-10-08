@@ -1,0 +1,27 @@
+@use '../variables' as vars;
+@use '../mixins' as m;
+
+.form-input,
+.form-textarea,
+.form-select {
+  width: 100%;
+  border-radius: 0.75rem; // 与 rounded-xl 对齐
+  @include m.transition();
+}
+
+.form-input,
+.form-select {
+  padding: 0.5rem 0.75rem; // 与输入框常规内边距对齐
+}
+
+.form-textarea {
+  padding: 0.75rem 1rem; // 文本域更舒适的内边距
+  resize: vertical;
+  min-height: 3rem;
+}
+
+.form-input:focus,
+.form-textarea:focus,
+.form-select:focus {
+  outline: none;
+}

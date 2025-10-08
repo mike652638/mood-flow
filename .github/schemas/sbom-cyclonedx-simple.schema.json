@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CycloneDX SBOM Simple Schema",
+  "type": "object",
+  "required": [
+    "bomFormat",
+    "specVersion",
+    "version"
+  ],
+  "properties": {
+    "bomFormat": {
+      "type": "string",
+      "enum": [
+        "CycloneDX"
+      ]
+    },
+    "specVersion": {
+      "type": "string"
+    },
+    "version": {
+      "type": [
+        "integer",
+        "number"
+      ]
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "purl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      }
+    }
+  }
+}

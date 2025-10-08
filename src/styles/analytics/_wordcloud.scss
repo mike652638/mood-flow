@@ -1,0 +1,15 @@
+@use '../mixins' as m;
+@use '../variables' as vars;
+
+.wordcloud-text {
+  @include m.unselectable();
+  @include m.drop-shadow-soft();
+  @include m.transition();
+  cursor: pointer;
+  filter: saturate(1.08);
+}
+
+.wordcloud-text:hover {
+  opacity: vars.$wordcloud-hover-opacity;
+  transform: translateY(-1px);
+}

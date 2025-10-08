@@ -1,0 +1,12 @@
+@use '../variables' as vars;
+@use '../mixins' as m;
+
+.modal {
+  @include m.transition();
+}
+
+.modal-panel {
+  border-radius: vars.$radius-2xl;
+  box-shadow: vars.$shadow-lg;
+  @include m.transition();
+}

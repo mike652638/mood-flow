@@ -1,0 +1,27 @@
+@use '../variables' as vars;
+@use '../mixins' as m;
+
+.tabs-nav {
+  display: flex;
+  gap: 0.5rem; // 与 space-x-2 对齐
+  padding: 0.25rem; // 与 p-1 对齐
+}
+
+.tab-item {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem vars.$space-4; // 与按钮舒适度一致
+  border-radius: 0.75rem;
+  font-weight: 500;
+  min-width: 0;
+  @include m.transition();
+  @include m.unselectable();
+}
+
+.tab-item-active {
+  transform: scale(1.02);
+  @include m.drop-shadow-soft();
+}

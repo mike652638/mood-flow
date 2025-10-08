@@ -1,0 +1,8 @@
+@use '../variables' as vars;
+@use '../mixins' as m;
+
+.progress-bar-fill {
+  @include m.progress-fill-gradient();
+  height: vars.$progress-height;
+  @apply rounded-l;
+}

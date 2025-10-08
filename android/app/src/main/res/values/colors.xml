@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 启动页背景与图标背景（深色主题，与启动图主色统一） -->
+    <color name="splash_background">#AC7AFD</color>
+    <color name="splash_icon_bg">#AC7AFD</color>
+</resources>

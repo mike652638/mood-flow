@@ -1,0 +1,427 @@
+/* 移动端优化样式（SCSS 迁移版）。注意：移除了重复的 .loading-spinner 与 @keyframes spin，统一使用全局 index.scss 定义。 */
+
+/* 触摸优化 */
+.touch-optimized {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* 按钮触摸反馈 */
+button,
+.btn {
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+button:active,
+.btn:active {
+  transform: scale(0.98);
+  opacity: 0.8;
+}
+
+/* 输入框优化 */
+input,
+textarea,
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  border-radius: 8px;
+  font-size: 16px; /* 防止 iOS 缩放 */
+}
+
+/* 滚动优化 */
+.scroll-smooth {
+  scroll-behavior: smooth;
+}
+
+/* 安全区域适配 */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-area-left {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+
+.safe-area-right {
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* 移动端导航栏优化 */
+@media (max-width: 768px) {
+  .mobile-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.95);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .mobile-nav-item {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 2px;
+  }
+}
+
+/* 手势优化 */
+.swipeable {
+  touch-action: pan-x pan-y;
+}
+
+.no-scroll {
+  touch-action: none;
+  overflow: hidden;
+}
+
+/* 模态框移动端优化 */
+@media (max-width: 768px) {
+  .modal-mobile {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 0;
+    max-height: 100vh;
+  }
+
+  .modal-content-mobile {
+    height: 100%;
+    overflow-y: auto;
+  }
+}
+
+/* 表单优化 */
+.form-mobile input,
+.form-mobile textarea {
+  padding: 12px 16px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* 卡片触摸优化 */
+.card-touchable {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-touchable:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 情绪选择器移动端优化 */
+.mood-selector-mobile {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 12px;
+  padding: 16px;
+}
+
+.mood-option-mobile {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  padding: 8px;
+  transition: all 0.2s ease;
+  min-height: 80px;
+}
+
+.mood-option-mobile:active {
+  transform: scale(0.95);
+}
+
+/* 日历移动端优化 */
+@media (max-width: 768px) {
+  .calendar-mobile {
+    font-size: 14px;
+  }
+
+  .calendar-day-mobile {
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* 图表移动端优化 */
+@media (max-width: 768px) {
+  .chart-container {
+    overflow-x: auto;
+  }
+
+  .chart-mobile {
+    min-width: 300px;
+  }
+}
+
+/* 状态栏适配 */
+/* 安全区域适配 */
+.pt-safe-area-inset-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* 新增：顶部安全区（含回退）工具类，确保在 Android 等 env 不可用时使用 --status-bar-height 兜底 */
+.pt-safe-area-top-fallback {
+  /* 改为使用可调的安全区额外顶部留白，避免在沉浸模式下标题被挖孔遮挡 */
+  padding-top: calc(
+    max(env(safe-area-inset-top, 0px), var(--status-bar-height, 24px)) + var(--safe-area-extra-top, 8px)
+  );
+}
+
+/* 非沉浸模式标题适配异形屏：居中并预留左右安全区，避免挖孔遮挡 */
+.notch-safe-title {
+  margin-left: max(env(safe-area-inset-left), 0px);
+  margin-right: max(env(safe-area-inset-right), 0px);
+  padding-left: max(env(safe-area-inset-left, 0px) * 0.5, 8px);
+  padding-right: max(env(safe-area-inset-right, 0px) * 0.5, 8px);
+}
+
+/* 原生环境下固定头部的内边距：左右安全区 */
+.safe-area-header {
+  padding-left: max(env(safe-area-inset-left), 16px);
+  padding-right: max(env(safe-area-inset-right), 16px);
+}
+
+.pb-safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 异形屏适配 - 挖孔摄像头和刘海屏支持 */
+.safe-area-header {
+  /* 确保头部内容不被挖孔摄像头遮挡 */
+  padding-left: max(env(safe-area-inset-left), 16px);
+  padding-right: max(env(safe-area-inset-right), 16px);
+}
+
+.notch-safe-title {
+  /* 标题区域避开挖孔摄像头 */
+  margin-left: max(env(safe-area-inset-left), 0px);
+  margin-right: max(env(safe-area-inset-right), 0px);
+  /* 为挖孔摄像头预留额外空间 */
+  padding-left: max(env(safe-area-inset-left, 0px) * 0.5, 8px);
+  padding-right: max(env(safe-area-inset-right, 0px) * 0.5, 8px);
+}
+
+/* 移动端样式 */
+@media (max-width: 768px) {
+  /* 沉浸式状态栏支持 */
+  .immersive-app {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* 状态栏覆盖层样式 */
+  .status-bar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: max(env(safe-area-inset-top, 0px), var(--status-bar-height, 0px));
+    z-index: 9999;
+    pointer-events: none;
+  }
+
+  .status-bar-overlay.bg-transparent {
+    background-color: transparent;
+  }
+
+  .status-bar-overlay.bg-custom {
+    background: var(--status-bar-bg-gradient, var(--status-bar-bg-color, #4caf50));
+  }
+
+  .status-bar-overlay.status-bar-transition {
+    transition: all 0.3s ease-in-out;
+  }
+
+  .status-bar-overlay.immersive {
+    background: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border-bottom: none;
+  }
+
+  /* 主容器适配 */
+  .app-container {
+    min-height: 100vh;
+    min-height: 100dvh; /* 动态视口高度 */
+  }
+
+  /* 沉浸式模式下的主容器 */
+  .app-container.immersive {
+    padding-top: 0;
+  }
+
+  /* 顶部导航栏适配 */
+  .top-nav {
+    padding-top: calc(env(safe-area-inset-top) + 16px);
+    background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+    position: relative;
+    z-index: 1000;
+  }
+
+  /* 沉浸式模式下的顶部导航 */
+  .top-nav.immersive {
+    padding-top: calc(env(safe-area-inset-top) + 16px);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* 深色主题适配 */
+  .dark-theme .top-nav.immersive {
+    background: rgba(33, 37, 41, 0.95);
+  }
+
+  /* 内容区域适配 */
+  .main-content {
+    padding-top: 20px;
+    padding-bottom: calc(env(safe-area-inset-bottom) + 20px);
+  }
+
+  /* 底部导航适配 */
+  .bottom-nav {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* 浮动按钮适配 */
+  .floating-button {
+    bottom: calc(env(safe-area-inset-bottom) + 20px);
+    right: calc(env(safe-area-inset-right) + 20px);
+  }
+
+  /* 模态框适配 */
+  .modal-content {
+    margin-top: env(safe-area-inset-top);
+    margin-bottom: env(safe-area-inset-bottom);
+    max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+
+  /* 输入框适配 */
+  .input-container {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* 键盘弹出时的适配 */
+  .keyboard-open .main-content {
+    padding-bottom: 0;
+  }
+
+  /* 状态栏主题切换动画 */
+  .status-bar-transition {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* 沉浸式模式指示器 */
+  .immersive-indicator {
+    position: fixed;
+    top: env(safe-area-inset-top);
+    right: 16px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.3);
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .immersive-indicator.active {
+    opacity: 1;
+  }
+
+  /* 安全区域调试辅助 */
+  .safe-area-debug {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 9998;
+  }
+
+  .safe-area-debug::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: env(safe-area-inset-top);
+    background: rgba(255, 0, 0, 0.2);
+  }
+
+  .safe-area-debug::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: env(safe-area-inset-bottom);
+    background: rgba(0, 255, 0, 0.2);
+  }
+}
+
+/* 键盘适配 */
+.keyboard-adjust {
+  transition: transform 0.3s ease;
+}
+
+/* 长按禁用 */
+.no-long-press {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* 拖拽禁用 */
+.no-drag {
+  -webkit-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+}
+
+/* 状态栏适配扩展：主内容顶部留白工具类 */
+.pt-safe-area-top-only {
+  /* 只为状态栏预留顶部安全区（适用于无固定 Header 的页面，如登录/注册） */
+  padding-top: calc(
+    max(env(safe-area-inset-top, 0px), var(--status-bar-height, 24px)) + var(--safe-area-extra-top, 8px)
+  );
+}
+
+.pt-safe-area-and-header {
+  /* 为状态栏 + 固定 Header 共同预留顶部空间（适用于存在固定头部的页面，如设置/记录/历史等） */
+  padding-top: calc(
+    max(env(safe-area-inset-top, 0px), var(--status-bar-height, 24px)) + var(--header-height, 56px) +
+      var(--safe-area-extra-top, 8px)
+  );
+}
+
+/* 兼容：已有的回退类保持不变 */
+/* .pt-safe-area-top-fallback 已定义（保留于本文件） */

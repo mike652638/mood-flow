@@ -1,0 +1,7 @@
+{
+  "latestVersion": "1.0.1",
+  "androidApkUrl": "https://example.com/moodflow-latest.apk",
+  "releaseNotes": "修复若干已知问题，优化沉浸模式标题安全区，提升稳定性。",
+  "mandatory": false,
+  "publishedAt": "2025-10-08"
+}

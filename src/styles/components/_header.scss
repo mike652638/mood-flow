@@ -1,0 +1,9 @@
+@use '../variables' as vars;
+
+.header-gradient {
+  background-image: linear-gradient(
+    to right,
+    rgba(vars.$color-primary, 0.06),
+    rgba(vars.$color-secondary, 0.06)
+  );
+}

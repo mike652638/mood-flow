@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>心流日记</title>
+    <meta name="description" content="一个帮助您记录和管理情绪的日记应用" />
+    <!-- 主题色，Chrome/Edge/Safari 支持，Firefox 系列与 Opera 不支持 -->
+    <!-- <meta name="theme-color" content="#3b82f6" /> -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <!-- 运行时配置占位：生产环境请在部署时注入密钥，避免打包泄露 -->
+    <script>
+      window.__RUNTIME_CONFIG__ = window.__RUNTIME_CONFIG__ || {
+        // 在生产环境由服务器注入：
+        // DEEPSEEK_BASE_URL: 'https://api.deepseek.com',
+        // DEEPSEEK_API_KEY: '<server-injected-secret>',
+        // DEEPSEEK_MODEL: 'deepseek-chat'
+      };
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

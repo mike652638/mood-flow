@@ -1,0 +1,59 @@
+@use '../variables' as vars;
+@use '../mixins' as m;
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem vars.$space-4;
+  border-radius: 0.75rem; // rounded-xl 基准
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  @include m.transition();
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+// 轻微的交互反馈与阴影统一
+.btn:hover {
+  transform: translateY(-0.5px);
+  @include m.drop-shadow-soft();
+}
+
+// 可选：语义化变体（颜色仍由现有类控制，避免冲突）
+.btn-primary {
+  // 不设置背景/文字颜色，避免与 Tailwind 配色冲突
+  @include m.transition();
+  &:hover {
+    filter: brightness(1.02);
+  }
+  &:active {
+    transform: scale(0.99);
+  }
+}
+
+.btn-danger {
+  @include m.transition();
+  &:hover {
+    filter: brightness(1.02);
+  }
+  &:active {
+    transform: scale(0.99);
+  }
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid transparent;
+  @include m.transition();
+  &:hover {
+    border-color: rgba(0,0,0,0.08);
+  }
+}

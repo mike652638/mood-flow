@@ -1,0 +1,12 @@
+@use '../variables' as vars;
+@use '../mixins' as m;
+
+.card {
+  border-radius: vars.$radius-2xl;
+  box-shadow: vars.$shadow-md;
+  @include m.transition();
+}
+
+.card:hover {
+  box-shadow: vars.$shadow-lg;
+}
