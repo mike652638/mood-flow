@@ -23,7 +23,11 @@ function getCurrentVersion(): string {
 
 // 简易语义版本比较：按主.次.修，忽略预发布标签
 export function compareVersions(a: string, b: string): number {
-  const toNums = (v: string) => v.split('-')[0].split('.').map(n => parseInt(n || '0', 10));
+  const toNums = (v: string) =>
+    v
+      .split('-')[0]
+      .split('.')
+      .map(n => parseInt(n || '0', 10));
   const [a1, a2, a3] = toNums(a);
   const [b1, b2, b3] = toNums(b);
   if (a1 !== b1) return a1 - b1;
@@ -72,10 +76,14 @@ export async function openUpdateLink(url: string): Promise<void> {
       await Browser.open({ url });
       return;
     }
-  } catch (err) { void 0; }
+  } catch (err) {
+    console.warn('Browser open failed:', err);
+  }
   try {
     window.open(url, '_blank');
-  } catch (err) { void 0; }
+  } catch (err) {
+    console.warn('Window open failed:', err);
+  }
 }
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';

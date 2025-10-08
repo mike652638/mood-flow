@@ -113,7 +113,9 @@ function App() {
                   await installDownloadedApk(dl.path);
                 }
               }
-            } catch (err) { void 0; }
+            } catch (err) {
+              console.warn('Pre-download failed:', err);
+            }
           } else {
             // 非强制更新：给予提示即可
             // 这里不打断用户流程，提示可前往设置页更新
@@ -158,12 +160,16 @@ function App() {
         document.addEventListener('visibilitychange', onVis);
         removeListener = () => document.removeEventListener('visibilitychange', onVis);
       }
-    } catch (err) { void 0; }
+    } catch (err) {
+      console.warn('Auto-check listener setup failed:', err);
+    }
 
     return () => {
       try {
         removeListener?.();
-      } catch (err) { void 0; }
+      } catch (err) {
+        console.warn('Auto-check listener cleanup failed:', err);
+      }
     };
   }, []);
 
@@ -204,7 +210,6 @@ function App() {
           {user ? (
             <Routes>
               <Route path='/' element={<Layout immersiveMode={immersiveMode} currentTheme={currentTheme} />}>
-                \
                 <Route index element={<Home />} />
                 <Route path='home' element={<Home />} />
                 <Route path='record' element={<Record />} />
