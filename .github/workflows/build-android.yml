@@ -388,9 +388,12 @@ jobs:
             android/app/build/outputs/apk/release/mood-flow-*-signed-*.apk
             android/app/build/outputs/apk/release/mood-flow-*-sinternal-*.apk
             android/app/build/outputs/apk/release/mood-flow-*-store-*.apk
+            # Fallback to generic outputs when tagging did not produce labeled files
+            android/app/build/outputs/apk/release/app-release.apk
             android/app/build/outputs/apk/release/mood-flow-*.apk.sha256
             android/app/build/outputs/apk/release/mood-flow-*.apk.sha1
             android/app/build/outputs/apk/release/mood-flow-*.apk.md5
+          if-no-files-found: warn
           retention-days: 30
 
       - name: Upload Tagged Release AABs (all labels)
@@ -403,9 +406,12 @@ jobs:
             android/app/build/outputs/bundle/release/mood-flow-*-signed-*.aab
             android/app/build/outputs/bundle/release/mood-flow-*-sinternal-*.aab
             android/app/build/outputs/bundle/release/mood-flow-*-store-*.aab
+            # Fallback to generic outputs when tagging did not produce labeled files
+            android/app/build/outputs/bundle/release/app-release.aab
             android/app/build/outputs/bundle/release/mood-flow-*.aab.sha256
             android/app/build/outputs/bundle/release/mood-flow-*.aab.sha1
             android/app/build/outputs/bundle/release/mood-flow-*.aab.md5
+          if-no-files-found: warn
           retention-days: 30
 
       - name: Upload Store AAB (for app store submission)
@@ -418,6 +424,7 @@ jobs:
             android/app/build/outputs/bundle/release/mood-flow-*-store-*.aab.sha256
             android/app/build/outputs/bundle/release/mood-flow-*-store-*.aab.sha1
             android/app/build/outputs/bundle/release/mood-flow-*-store-*.aab.md5
+          if-no-files-found: warn
           retention-days: 30
 
   publish-release:
