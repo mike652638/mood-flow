@@ -85,38 +85,38 @@ jobs:
           ./gradlew assembleDebug --no-daemon
 
       - name: Prepare signing keys (Release)
-         if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
-         run: |
-           mkdir -p android/app/keystore
-           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore/release.keystore
-           cat > android/keystore.properties << 'EOF'
-           storeFile=keystore/release.keystore
-           storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-           keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
-           keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
-           EOF
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: |
+          mkdir -p android/app/keystore
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore/release.keystore
+          cat > android/keystore.properties << 'EOF'
+          storeFile=keystore/release.keystore
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          EOF
 
       - name: Validate Release Keystore & Alias
-         if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
-         shell: bash
-         run: |
-           set -e
-           test -f android/app/keystore/release.keystore || { echo "release.keystore missing" >&2; exit 1; }
-           test -f android/keystore.properties || { echo "keystore.properties missing" >&2; exit 1; }
-           EXPECT_ALIAS="${{ secrets.ANDROID_KEY_ALIAS }}"
-           echo "Expect alias: ${EXPECT_ALIAS}"
-           ACTUAL_ALIAS=$(keytool -list -v -keystore android/app/keystore/release.keystore -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" | grep -m1 '^Alias name:' | sed 's/.*: //') || true
-           echo "Actual alias: ${ACTUAL_ALIAS}"
-           keytool -list -keystore android/app/keystore/release.keystore -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" -alias "${EXPECT_ALIAS}" >/dev/null || { echo "Alias not found or mismatch" >&2; exit 1; }
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        shell: bash
+        run: |
+          set -e
+          test -f android/app/keystore/release.keystore || { echo "release.keystore missing" >&2; exit 1; }
+          test -f android/keystore.properties || { echo "keystore.properties missing" >&2; exit 1; }
+          EXPECT_ALIAS="${{ secrets.ANDROID_KEY_ALIAS }}"
+          echo "Expect alias: ${EXPECT_ALIAS}"
+          ACTUAL_ALIAS=$(keytool -list -v -keystore android/app/keystore/release.keystore -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" | grep -m1 '^Alias name:' | sed 's/.*: //') || true
+          echo "Actual alias: ${ACTUAL_ALIAS}"
+          keytool -list -keystore android/app/keystore/release.keystore -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" -alias "${EXPECT_ALIAS}" >/dev/null || { echo "Alias not found or mismatch" >&2; exit 1; }
 
       - name: Build Android Release (APK + AAB)
         if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
         run: |
-         cd android
-         chmod +x ./gradlew
-         ./gradlew assembleRelease bundleRelease --no-daemon
-         ls -lh app/build/outputs/apk/release/app-release.apk || true
-         ls -lh app/build/outputs/bundle/release/app-release.aab || true
+          cd android
+          chmod +x ./gradlew
+          ./gradlew assembleRelease bundleRelease --no-daemon
+          ls -lh app/build/outputs/apk/release/app-release.apk || true
+          ls -lh app/build/outputs/bundle/release/app-release.aab || true
 
       # Optional: Use unified script (Windows runner required for device install/smoke test)
       # - name: Build via unified script (optional)
