@@ -116,6 +116,8 @@ jobs:
           ACTUAL_ALIAS=$(keytool -list -v -keystore android/app/keystore/release.keystore -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" | grep -m1 '^Alias name:' | sed 's/.*: //') || true
           echo "Actual alias: ${ACTUAL_ALIAS}"
           keytool -list -keystore android/app/keystore/release.keystore -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" -alias "${EXPECT_ALIAS}" >/dev/null || { echo "Alias not found or mismatch" >&2; exit 1; }
+          # Verify key password is valid for the alias by attempting to export the certificate
+          keytool -exportcert -alias "${EXPECT_ALIAS}" -keystore android/app/keystore/release.keystore -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" -keypass "${{ secrets.ANDROID_KEY_PASSWORD }}" -rfc >/dev/null || { echo "Key password invalid for alias ${EXPECT_ALIAS}" >&2; exit 1; }
 
       - name: Build Android Release (APK + AAB)
         if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
@@ -247,16 +249,21 @@ jobs:
 
       - name: Generate signing metadata (keystore fingerprints)
         if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        continue-on-error: true
         shell: bash
         run: |
           set -e
           mkdir -p dist/meta
-          keytool -list -v -keystore android/app/keystore/release.keystore -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" -alias "${{ secrets.ANDROID_KEY_ALIAS }}" -keypass "${{ secrets.ANDROID_KEY_PASSWORD }}" > dist/meta/signing.txt
-          alias=$(grep -m1 '^Alias name:' dist/meta/signing.txt | sed 's/.*: //')
-          sha256=$(grep -m1 'SHA-256:' dist/meta/signing.txt | awk '{print $2}')
-          sha1=$(grep -m1 'SHA1:' dist/meta/signing.txt | awk '{print $2}')
-          md5=$(grep -m1 'MD5:' dist/meta/signing.txt | awk '{print $2}')
-          printf '{\n  "alias": "%s",\n  "sha256": "%s",\n  "sha1": "%s",\n  "md5": "%s",\n  "generatedAt": "%s"\n}\n' "$alias" "$sha256" "$sha1" "$md5" "$(date -Iseconds)" > dist/meta/signing-metadata.json
+          if keytool -list -v -keystore android/app/keystore/release.keystore -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" -alias "${{ secrets.ANDROID_KEY_ALIAS }}" -keypass "${{ secrets.ANDROID_KEY_PASSWORD }}" > dist/meta/signing.txt; then
+            alias=$(grep -m1 '^Alias name:' dist/meta/signing.txt | sed 's/.*: //')
+            sha256=$(grep -m1 'SHA-256:' dist/meta/signing.txt | awk '{print $2}')
+            sha1=$(grep -m1 'SHA1:' dist/meta/signing.txt | awk '{print $2}')
+            md5=$(grep -m1 'MD5:' dist/meta/signing.txt | awk '{print $2}')
+            printf '{\n  "alias": "%s",\n  "sha256": "%s",\n  "sha1": "%s",\n  "md5": "%s",\n  "generatedAt": "%s"\n}\n' "$alias" "$sha256" "$sha1" "$md5" "$(date -Iseconds)" > dist/meta/signing-metadata.json
+          else
+            echo "keytool listing failed; writing minimal signing-metadata.json and continuing."
+            printf '{\n  "alias": "",\n  "sha256": "",\n  "sha1": "",\n  "md5": "",\n  "error": "keytool failed",\n  "generatedAt": "%s"\n}\n' "$(date -Iseconds)" > dist/meta/signing-metadata.json
+          fi
 
       - name: Generate artifacts manifest and release notes
         shell: bash
