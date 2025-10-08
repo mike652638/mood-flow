@@ -396,7 +396,16 @@ const Analytics = () => {
 
   // 饼图默认折线标签（自绘引导线，仅标签显示时绘制），并避免小屏顶部越界裁剪
   const RADIAN = Math.PI / 180;
-  const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, payload }: any) => {
+  type PieLabelProps = {
+    cx: number;
+    cy: number;
+    midAngle: number;
+    innerRadius: number;
+    outerRadius: number;
+    percent: number;
+    payload?: { name?: string; value?: number };
+  };
+  const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, payload }: PieLabelProps) => {
     if (percent < pieConfig.labelThreshold) return null;
 
     const w = pieSize.width;

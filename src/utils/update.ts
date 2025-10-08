@@ -17,7 +17,8 @@ const AUTO_CHECK_KEY = 'app.update.autoCheck';
 
 function getCurrentVersion(): string {
   const injected = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : undefined;
-  const env = (import.meta as any).env?.VITE_APP_VERSION as string | undefined;
+  const envObj = (import.meta as unknown as { env?: { VITE_APP_VERSION?: string } }).env;
+  const env = envObj?.VITE_APP_VERSION as string | undefined;
   return (injected || env || '1.0.0').trim();
 }
 
@@ -37,7 +38,9 @@ export function compareVersions(a: string, b: string): number {
 
 export async function checkForUpdate(customUrl?: string): Promise<UpdateCheckResult> {
   const current = getCurrentVersion();
-  const url = (customUrl || (import.meta as any).env?.VITE_APP_UPDATE_URL || '/updates.json') as string;
+  const envObj = (import.meta as unknown as { env?: { VITE_APP_UPDATE_URL?: string } }).env;
+  const envUrl = envObj?.VITE_APP_UPDATE_URL;
+  const url = (customUrl ?? envUrl ?? '/updates.json') as string;
   try {
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error(`Update source ${url} responded ${res.status}`);

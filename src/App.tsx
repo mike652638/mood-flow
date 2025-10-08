@@ -120,7 +120,6 @@ function App() {
             // 非强制更新：给予提示即可
             // 这里不打断用户流程，提示可前往设置页更新
             // 使用轻量 toast 提示，不做交互按钮，避免跨端兼容复杂度
-            // eslint-disable-next-line no-console
             console.info(`发现新版本 V${result.info.latestVersion}，可前往“设置”页面更新`);
           }
         }
@@ -138,8 +137,8 @@ function App() {
       if (isNative()) {
         // 动态导入以避免 Web 端无插件时报错
         import('@capacitor/app')
-          .then(mod => {
-            const App = (mod as any).App;
+          .then((mod: typeof import('@capacitor/app')) => {
+            const App = mod.App;
             const sub = App.addListener('appStateChange', (state: { isActive: boolean }) => {
               if (state?.isActive) performAutoCheck();
             });
@@ -257,8 +256,8 @@ function App() {
                 <button
                   onClick={async () => {
                     try {
-                      const mod = await import('@capacitor/app');
-                      const AppPlugin = (mod as any).App;
+                      const mod: typeof import('@capacitor/app') = await import('@capacitor/app');
+                      const AppPlugin = mod.App;
                       if (AppPlugin?.exitApp) {
                         await AppPlugin.exitApp();
                         return;
