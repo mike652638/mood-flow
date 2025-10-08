@@ -113,7 +113,7 @@ function App() {
                   await installDownloadedApk(dl.path);
                 }
               }
-            } catch {}
+            } catch (err) { void 0; }
           } else {
             // 非强制更新：给予提示即可
             // 这里不打断用户流程，提示可前往设置页更新
@@ -158,16 +158,12 @@ function App() {
         document.addEventListener('visibilitychange', onVis);
         removeListener = () => document.removeEventListener('visibilitychange', onVis);
       }
-    } catch {
-      // 忽略监听设置错误
-    }
+    } catch (err) { void 0; }
 
     return () => {
       try {
         removeListener?.();
-      } catch {
-        // 忽略移除错误
-      }
+      } catch (err) { void 0; }
     };
   }, []);
 

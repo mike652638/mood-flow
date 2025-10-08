@@ -72,10 +72,10 @@ export async function openUpdateLink(url: string): Promise<void> {
       await Browser.open({ url });
       return;
     }
-  } catch {}
+  } catch (err) { void 0; }
   try {
     window.open(url, '_blank');
-  } catch {}
+  } catch (err) { void 0; }
 }
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
