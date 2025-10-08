@@ -241,7 +241,9 @@ jobs:
         run: |
           set -e
           mkdir -p dist/meta
-          npx @cyclonedx/cyclonedx-npm --output-file dist/meta/sbom-npm.json --include-dev true
+          # Generate CycloneDX SBOM for npm deps. The current CLI no longer supports --include-dev;
+          # dev dependencies are included by default unless NODE_ENV=production.
+          npx --yes @cyclonedx/cyclonedx-npm --output-file dist/meta/sbom-npm.json
 
       - name: Generate signing metadata (keystore fingerprints)
         if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
