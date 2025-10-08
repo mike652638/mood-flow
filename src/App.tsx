@@ -142,7 +142,18 @@ function App() {
             const sub = App.addListener('appStateChange', (state: { isActive: boolean }) => {
               if (state?.isActive) performAutoCheck();
             });
-            removeListener = () => sub?.remove?.();
+            // addListener 在运行时返回 Promise<PluginListenerHandle>；此处需在移除时等待句柄
+            removeListener = () => {
+              try {
+                // 兼容 Promise 句柄与直接句柄两种情况
+                const maybePromise = sub as unknown as Promise<{ remove: () => Promise<void> }> | { remove: () => Promise<void> };
+                if (typeof (maybePromise as any)?.then === 'function') {
+                  (maybePromise as Promise<{ remove: () => Promise<void> }>).then(h => h.remove()).catch(() => {});
+                } else {
+                  (maybePromise as { remove: () => Promise<void> }).remove?.();
+                }
+              } catch {}
+            };
           })
           .catch(() => {
             // 原生失败时降级到文档可见性

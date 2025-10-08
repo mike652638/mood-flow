@@ -403,7 +403,7 @@ const Analytics = () => {
     innerRadius: number;
     outerRadius: number;
     percent: number;
-    payload?: { name?: string; value?: number };
+    payload: { name?: string; value?: number; mood_type: MoodType };
   };
   const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, payload }: PieLabelProps) => {
     if (percent < pieConfig.labelThreshold) return null;

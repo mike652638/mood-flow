@@ -63,6 +63,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint (strict)
+        run: npm run lint -- --max-warnings=0
+
       - name: Build web app
         run: npm run build
         env:
@@ -87,7 +90,7 @@ jobs:
         run: |
           cd android
           chmod +x ./gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon --stacktrace || { echo "Gradle Debug failed; showing outputs"; ls -R app/build/outputs || true; ls -R app/build/reports || true; exit 1; }
 
       - name: Prepare signing keys (Release)
         if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
@@ -119,7 +122,7 @@ jobs:
         run: |
           cd android
           chmod +x ./gradlew
-          ./gradlew assembleRelease bundleRelease --no-daemon
+          ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace || { echo "Gradle Release failed; showing outputs"; ls -R app/build/outputs || true; ls -R app/build/reports || true; exit 1; }
           ls -lh app/build/outputs/apk/release/app-release.apk || true
           ls -lh app/build/outputs/bundle/release/app-release.aab || true
 
