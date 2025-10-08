@@ -1,4 +1,5 @@
 @use './variables' as vars;
+@use 'sass:map';
 
 @mixin transition($timing: vars.$transition-fast) {
   transition: all $timing;
@@ -33,7 +34,7 @@
 }
 
 @mixin type-scale($key, $line-height: 1.5) {
-  $size: map-get(vars.$type-scale, $key);
+  $size: map.get(vars.$type-scale, $key);
   @if $size == null {
     @warn "Unknown type scale key: #{$key}";
   } @else {

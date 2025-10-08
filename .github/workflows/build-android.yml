@@ -189,7 +189,10 @@ jobs:
             echo "No store-labeled APK found. Fallback to release-labeled."
             APK_FILE=$(ls -1 android/app/build/outputs/apk/release/mood-flow-*-release-*.apk | tail -n1)
           fi
-          test -n "$APK_FILE" || { echo "No APK to upload" >&2; exit 1; }
+          if [ -z "$APK_FILE" ]; then
+            echo "No APK to upload; skipping R2 upload (non-fatal)"
+            exit 0
+          fi
           BASENAME=$(basename "$APK_FILE")
           echo "Uploading $BASENAME to R2 bucket $R2_BUCKET"
           aws --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
@@ -366,6 +369,7 @@ jobs:
         with:
           name: android-apk-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: warn
           retention-days: 30
 
       - name: Upload Tagged Release APKs

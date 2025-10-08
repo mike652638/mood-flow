@@ -1,3 +1,5 @@
+@use "sass:color";
+
 $transition-fast: 0.2s ease-in-out;
 $transition-slow: 0.5s ease-out;
 
@@ -15,9 +17,9 @@ $wordcloud-text-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);
 
 // Design Tokens: Theme palette
 $color-primary: #6d28d9; // purple-700
-$color-primary-hover: lighten($color-primary, 8%);
+$color-primary-hover: color.adjust($color-primary, $lightness: 8%);
 $color-secondary: #0ea5e9; // sky-500
-$color-secondary-hover: lighten($color-secondary, 8%);
+$color-secondary-hover: color.adjust($color-secondary, $lightness: 8%);
 $color-success: #10b981; // emerald-500
 $color-warning: #f59e0b; // amber-500
 $color-danger: #ef4444; // red-500
