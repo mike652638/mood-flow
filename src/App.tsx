@@ -146,13 +146,22 @@ function App() {
             removeListener = () => {
               try {
                 // 兼容 Promise 句柄与直接句柄两种情况
-                const maybePromise = sub as unknown as Promise<{ remove: () => Promise<void> }> | { remove: () => Promise<void> };
-                if (typeof (maybePromise as any)?.then === 'function') {
+                const maybePromise = sub as unknown as
+                  | Promise<{ remove: () => Promise<void> }>
+                  | { remove: () => Promise<void> };
+                // 使用类型收窄避免显式 any：判断是否为 Promise
+                const isPromise = (v: unknown): v is Promise<{ remove: () => Promise<void> }> => {
+                  return typeof v === 'object' && v !== null && 'then' in (v as Record<string, unknown>) &&
+                    typeof (v as Record<string, unknown>).then === 'function';
+                };
+                if (isPromise(maybePromise)) {
                   (maybePromise as Promise<{ remove: () => Promise<void> }>).then(h => h.remove()).catch(() => {});
                 } else {
                   (maybePromise as { remove: () => Promise<void> }).remove?.();
                 }
-              } catch {}
+              } catch (err) {
+                console.warn('Auto-check listener cleanup failed:', err);
+              }
             };
           })
           .catch(() => {
