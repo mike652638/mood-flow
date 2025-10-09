@@ -3,7 +3,7 @@ param(
   [string]$CommitMessage,
   [string]$Tag,
   [string]$TagPrefix = 'v',
-  [int]$WaitSeconds = 180,
+  [int]$WaitSeconds = 600,
   [int]$PollIntervalSeconds = 10
 )
 
@@ -93,7 +93,7 @@ function Get-Run-ByHeadSha {
     $resp = Invoke-RestMethod -Uri $url -Headers $headers -Method GET
     return $resp.workflow_runs
   } catch {
-    Write-Warn "获取 workflow runs 失败：$($_.Exception.Message)"
+    Write-Warn ("Failed to fetch workflow runs: " + $_.Exception.Message)
     return $null
   }
 }
@@ -107,7 +107,7 @@ function Get-RunJobs {
     $resp = Invoke-RestMethod -Uri $url -Headers $headers -Method GET
     return $resp.jobs
   } catch {
-    Write-Warn "获取 jobs 失败：$($_.Exception.Message)"
+    Write-Warn ("Failed to fetch jobs: " + $_.Exception.Message)
     return $null
   }
 }
@@ -118,9 +118,9 @@ function Save-SummaryJson {
   try {
     $json = $obj | ConvertTo-Json -Depth 6
     Set-Content -Path $outPath -Value $json -Encoding UTF8
-    Write-Ok "已保存运行摘要：$outPath"
+    Write-Ok ("Saved run summary: " + $outPath)
   } catch {
-    Write-Warn "保存摘要失败：$($_.Exception.Message)"
+    Write-Warn ("Failed to save summary: " + $_.Exception.Message)
   }
 }
 
@@ -176,7 +176,7 @@ try {
     $runs = Get-Run-ByHeadSha -Owner $owner -Repo $repo -Sha $sha -Token $token
     if ($runs -and $runs.Count -gt 0) {
       $run = $runs[0]
-      Write-Info "找到运行：run_id=$($run.id), status=$($run.status)"
+      Write-Info ("Found run: run_id=" + $run.id + ", status=" + $run.status)
       break
     }
     Write-Info 'Run not indexed yet; waiting...'
