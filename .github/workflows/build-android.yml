@@ -48,7 +48,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Setup Java
@@ -255,7 +255,8 @@ jobs:
           set -e
           mkdir -p dist/meta
           # Force predictable English output to match parsing patterns
-          if LC_ALL=C keytool -list -v -keystore android/app/keystore/release.keystore -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" -alias "${{ secrets.ANDROID_KEY_ALIAS }}" -keypass "${{ secrets.ANDROID_KEY_PASSWORD }}" > dist/meta/signing.txt; then
+          # Note: omit -keypass to avoid listing failures on some JDK/keytool versions
+          if LC_ALL=C keytool -list -v -keystore android/app/keystore/release.keystore -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" -alias "${{ secrets.ANDROID_KEY_ALIAS }}" > dist/meta/signing.txt; then
             # Use sed/head pipelines that do not fail under set -e -o pipefail
             alias=$(sed -n 's/^Alias name: //p' dist/meta/signing.txt | head -n1)
             sha256=$(sed -n 's/^SHA-256: //p' dist/meta/signing.txt | head -n1)
