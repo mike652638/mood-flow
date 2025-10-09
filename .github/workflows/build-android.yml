@@ -475,8 +475,8 @@ jobs:
           tag_name: ${{ github.ref_name }}
           body_path: dist/meta/release-notes.md
           # Avoid duplicate uploads: store-labeled AABs are already included in dist/aab/**
-          # Also allow overwriting existing assets on re-runs
-          overwrite: true
+          # Allow unmatched globs to be skipped without failing the job
+          fail_on_unmatched_files: false
           files: |
             dist/apk/**
             dist/aab/**
