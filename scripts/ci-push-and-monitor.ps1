@@ -88,7 +88,7 @@ function Get-Run-ByHeadSha {
   param([string]$Owner, [string]$Repo, [string]$Sha, [string]$Token)
   $headers = @{ 'Accept' = 'application/vnd.github+json' }
   if ($Token) { $headers['Authorization'] = ('Bearer ' + $Token); $headers['X-GitHub-Api-Version'] = '2022-11-28' }
-  $url = ('https://api.github.com/repos/' + $Owner + '/' + $Repo + '/actions/runs?head_sha=' + $Sha + '&per_page=20')
+  $url = ('https://api.github.com/repos/' + $Owner + '/' + $Repo + '/actions/runs?head_sha=' + $Sha + '&per_page=50')
   try {
     $resp = Invoke-RestMethod -Uri $url -Headers $headers -Method GET
     return $resp.workflow_runs
@@ -110,6 +110,20 @@ function Get-RunJobs {
     Write-Warn ("Failed to fetch jobs: " + $_.Exception.Message)
     return $null
   }
+}
+
+# Fallback: use gh CLI to list recent push runs and filter by head_sha
+function Find-Run-Fallback {
+  param([string]$Owner, [string]$Repo, [string]$Sha)
+  try {
+    $json = (& gh api ("repos/"+$Owner+"/"+$Repo+"/actions/runs?event=push&per_page=50") 2>$null)
+    if ($json) {
+      $obj = $json | ConvertFrom-Json
+      $runs = $obj.workflow_runs | Where-Object { $_.head_sha -eq $Sha }
+      return $runs
+    }
+  } catch {}
+  return $null
 }
 
 function Save-SummaryJson {
@@ -177,6 +191,13 @@ try {
     if ($runs -and $runs.Count -gt 0) {
       $run = $runs[0]
       Write-Info ("Found run: run_id=" + $run.id + ", status=" + $run.status)
+      break
+    }
+    # Fallback with gh CLI (in case REST indexing or filter fails)
+    $runsGh = Find-Run-Fallback -Owner $owner -Repo $repo -Sha $sha
+    if ($runsGh -and $runsGh.Count -gt 0) {
+      $run = $runsGh[0]
+      Write-Info ("Found run via gh: run_id=" + $run.id + ", status=" + $run.status)
       break
     }
     Write-Info 'Run not indexed yet; waiting...'

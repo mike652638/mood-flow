@@ -3,5 +3,5 @@
     "ok":  false,
     "actions_url":  "https://github.com/mike652638/mood-flow/actions?query=event%3Apush",
     "reason":  "run_not_found",
-    "tag":  "v1.1.96-ci8"
+    "tag":  "v1.1.98"
 }
