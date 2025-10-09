@@ -32,8 +32,8 @@ android {
             ]
         }
     }
-    // Load keystore properties from android/keystore.properties
-    def keystorePropsFile = file('../keystore.properties')
+    // Load keystore properties from app/keystore/keystore.properties
+    def keystorePropsFile = file('keystore/keystore.properties')
     def keystoreProps = new Properties()
     if (keystorePropsFile.exists()) {
         keystoreProps.load(new FileInputStream(keystorePropsFile))

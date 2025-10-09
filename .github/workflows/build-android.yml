@@ -97,7 +97,7 @@ jobs:
         run: |
           mkdir -p android/app/keystore
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore/release.keystore
-          cat > android/keystore.properties << 'EOF'
+          cat > android/app/keystore/keystore.properties << 'EOF'
           storeFile=keystore/release.keystore
           storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
@@ -110,7 +110,7 @@ jobs:
         run: |
           set -e
           test -f android/app/keystore/release.keystore || { echo "release.keystore missing" >&2; exit 1; }
-          test -f android/keystore.properties || { echo "keystore.properties missing" >&2; exit 1; }
+          test -f android/app/keystore/keystore.properties || { echo "keystore.properties missing" >&2; exit 1; }
           EXPECT_ALIAS="${{ secrets.ANDROID_KEY_ALIAS }}"
           echo "Expect alias: ${EXPECT_ALIAS}"
           ACTUAL_ALIAS=$(keytool -list -v -keystore android/app/keystore/release.keystore -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" | grep -m1 '^Alias name:' | sed 's/.*: //') || true
