@@ -1,0 +1,469 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      smoke_test:
+        description: 'Run smoke test (requires connected device & Windows runner)'
+        type: boolean
+        default: false
+      prefer_emulator:
+        description: 'Prefer emulator when selecting device'
+        type: boolean
+        default: false
+  push:
+    branches: [main, master]
+    tags: ['*']
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    env:
+      # build-android.cmd will respect SKIP_SMOKE_TEST/PREFER_EMULATOR when used by CI
+      SKIP_SMOKE_TEST: ${{ ! inputs.smoke_test }}
+      PREFER_EMULATOR: ${{ inputs.prefer_emulator }}
+      # Cloudflare R2 configuration (set via repo/org secrets)
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      R2_PUBLIC_BASE: ${{ secrets.R2_PUBLIC_BASE }}
+      # Android signing secrets exposed as env for step conditions
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (strict)
+        run: npm run lint -- --max-warnings=0
+
+      - name: Build web app
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Validate App IDs consistency (applicationId vs capacitor appId)
+        shell: bash
+        run: |
+          set -e
+          APPID=$(grep -m1 -E 'applicationId\s+"[^"]+"' android/app/build.gradle | sed -E 's/.*"([^"]+)".*/\1/')
+          CAPID=$(grep -m1 -E "appId:\s*'[^']+'" capacitor.config.ts | sed -E "s/.*'([^']+)'.*/\1/")
+          if [ -n "$APPID" ] && [ -n "$CAPID" ] && [ "$APPID" != "$CAPID" ]; then
+            echo "Config mismatch: build.gradle applicationId=$APPID, capacitor.config.ts appId=$CAPID" >&2
+            exit 1
+          fi
+          echo "Config IDs validated: $APPID"
+      - name: Build Android APK (Debug)
+        run: |
+          cd android
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace || { echo "Gradle Debug failed; showing outputs"; ls -R app/build/outputs || true; ls -R app/build/reports || true; exit 1; }
+      - name: Prepare signing keys (Release)
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: |
+          mkdir -p android/app/keystore
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore/release.keystore
+          cat > android/app/keystore/keystore.properties << 'EOF'
+          storeFile=keystore/release.keystore
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          EOF
+      - name: Validate Release Keystore & Alias
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        shell: bash
+        run: |
+          set -e
+          test -f android/app/keystore/release.keystore || { echo "release.keystore missing" >&2; exit 1; }
+          test -f android/app/keystore/keystore.properties || { echo "keystore.properties missing" >&2; exit 1; }
+          EXPECT_ALIAS="${{ secrets.ANDROID_KEY_ALIAS }}"
+          echo "Expect alias: ${EXPECT_ALIAS}"
+          ACTUAL_ALIAS=$(keytool -list -v -keystore android/app/keystore/release.keystore -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" | grep -m1 '^Alias name:' | sed 's/.*: //') || true
+          echo "Actual alias: ${ACTUAL_ALIAS}"
+          keytool -list -keystore android/app/keystore/release.keystore -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" -alias "${EXPECT_ALIAS}" >/dev/null || { echo "Alias not found or mismatch" >&2; exit 1; }
+          # Verify key password is valid for the alias by attempting to export the certificate
+          keytool -exportcert -alias "${EXPECT_ALIAS}" -keystore android/app/keystore/release.keystore -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" -keypass "${{ secrets.ANDROID_KEY_PASSWORD }}" -rfc >/dev/null || { echo "Key password invalid for alias ${EXPECT_ALIAS}" >&2; exit 1; }
+      - name: Build Android Release (APK + AAB)
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: |
+          cd android
+          chmod +x ./gradlew
+          ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace || { echo "Gradle Release failed; showing outputs"; ls -R app/build/outputs || true; ls -R app/build/reports || true; exit 1; }
+          ls -lh app/build/outputs/apk/release/app-release.apk || true
+          ls -lh app/build/outputs/bundle/release/app-release.aab || true
+      # Optional: Use unified script (Windows runner required for device install/smoke test)
+      # - name: Build via unified script (optional)
+      #   if: ${{ false }}
+      #   run: |
+      #     cmd /c .\build-android.cmd release -NoInstall ${ inputs.smoke_test && '' || '-SkipSmokeTest' }
+      #   shell: bash
+
+      - name: Tag artifacts (release/signed/internal/store)
+        run: node scripts/tag-artifacts.cjs --labels "release,signed,sinternal,store" --product mood-flow
+
+      - name: Generate checksums for tagged artifacts (APK/AAB)
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        shell: bash
+        run: |
+          set -e
+          while IFS= read -r -d '' f; do
+            echo "Checksumming $f"
+            sha256sum "$f" | tee "${f}.sha256"
+            sha1sum   "$f" | tee "${f}.sha1"
+            md5sum    "$f" | tee "${f}.md5"
+          done < <(find android/app/build/outputs -type f \( -name "mood-flow-*.apk" -o -name "mood-flow-*.aab" \) -print0)
+      - name: Read Android versionName from Gradle
+        shell: bash
+        run: |
+          set -e
+          VERSION_NAME=$(grep -m1 -E 'versionName\s+"[^"]+"' android/app/build.gradle | sed -E 's/.*"([^"]+)".*/\1/')
+          if [ -z "$VERSION_NAME" ]; then
+            echo "versionName not found in build.gradle" >&2
+          else
+            echo "Found versionName: $VERSION_NAME"
+          fi
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+      - name: Summarize release notes for updates.json
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        shell: bash
+        run: |
+          set -e
+          if [ -f dist/meta/release-notes.md ]; then
+            node scripts/summarize-release-notes.cjs dist/meta/release-notes.md > .notes.txt || true
+            NOTES_SUMMARY=$(cat .notes.txt | tr '\n' ' ')
+            echo "NOTES_SUMMARY=$NOTES_SUMMARY" >> "$GITHUB_ENV"
+            echo "Notes summary: $NOTES_SUMMARY"
+          else
+            echo "dist/meta/release-notes.md missing; skip notes summary"
+          fi
+      - name: Upload Release APK to Cloudflare R2 (store label)
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' && env.R2_ACCOUNT_ID != '' && env.R2_ACCESS_KEY_ID != '' && env.R2_SECRET_ACCESS_KEY != '' && env.R2_BUCKET != '' }}
+        shell: bash
+        run: |
+          set -e
+          echo "Installing AWS CLI (for S3-compatible R2)"
+          pip3 install --user awscli
+          export PATH="$HOME/.local/bin:$PATH"
+          echo "Configuring AWS CLI credentials"
+          aws configure set aws_access_key_id "$R2_ACCESS_KEY_ID"
+          aws configure set aws_secret_access_key "$R2_SECRET_ACCESS_KEY"
+          aws configure set default.region us-east-1
+          echo "Selecting APK file (store label)"
+          APK_FILE=$(ls -1 android/app/build/outputs/apk/release/mood-flow-*-store-*.apk | tail -n1)
+          if [ -z "$APK_FILE" ]; then
+            echo "No store-labeled APK found. Fallback to release-labeled."
+            APK_FILE=$(ls -1 android/app/build/outputs/apk/release/mood-flow-*-release-*.apk | tail -n1)
+          fi
+          if [ -z "$APK_FILE" ]; then
+            echo "No APK to upload; skipping R2 upload (non-fatal)"
+            exit 0
+          fi
+          BASENAME=$(basename "$APK_FILE")
+          echo "Uploading $BASENAME to R2 bucket $R2_BUCKET"
+          aws --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+            s3 cp "$APK_FILE" "s3://${R2_BUCKET}/releases/${BASENAME}" \
+            --content-type application/vnd.android.package-archive \
+            --acl public-read || true
+          # Compose public URL if base provided; otherwise use r2.dev convention
+          if [ -n "$R2_PUBLIC_BASE" ]; then
+            R2_URL="${R2_PUBLIC_BASE}/releases/${BASENAME}"
+          else
+            R2_URL="https://${R2_BUCKET}.r2.dev/releases/${BASENAME}"
+          fi
+          echo "R2_URL=${R2_URL}" >> "$GITHUB_ENV"
+      - name: Update public/updates.json with APK URL
+        if: ${{ env.R2_URL != '' }}
+        shell: bash
+        run: |
+          set -e
+          CMD=(node scripts/update-updates-json.cjs --apk-url "$R2_URL")
+          if [ -n "$VERSION_NAME" ]; then CMD+=(--version "$VERSION_NAME"); fi
+          if [ -n "$NOTES_SUMMARY" ]; then CMD+=(--notes "$NOTES_SUMMARY"); fi
+          echo "Running: ${CMD[*]}"
+          "${CMD[@]}"
+      - name: Commit updates.json back to repo (branch runs only)
+        if: ${{ env.R2_URL != '' && github.event_name != 'pull_request' && startsWith(github.ref, 'refs/heads/') }}
+        shell: bash
+        run: |
+          set -e
+          # Extra safety: skip when on detached HEAD (e.g., tag runs)
+          if [ "$(git rev-parse --abbrev-ref HEAD)" = "HEAD" ]; then
+            echo "Detached HEAD detected (tag run); skip committing updates.json"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/updates.json
+          if git diff --cached --quiet; then
+            echo "No updates to commit"
+          else
+            git commit -m "chore(ci): update updates.json with R2 APK URL"
+            git push
+          fi
+      - name: Generate SBOM (npm)
+        shell: bash
+        run: |
+          set -e
+          mkdir -p dist/meta
+          # Generate CycloneDX SBOM for npm deps. The current CLI no longer supports --include-dev;
+          # dev dependencies are included by default unless NODE_ENV=production.
+          npx --yes @cyclonedx/cyclonedx-npm --output-file dist/meta/sbom-npm.json
+      - name: Generate signing metadata (keystore fingerprints)
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -e
+          mkdir -p dist/meta
+          # Force predictable English output to match parsing patterns
+          # Note: omit -keypass to avoid listing failures on some JDK/keytool versions
+          if LC_ALL=C keytool -list -v -keystore android/app/keystore/release.keystore -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" -alias "${{ secrets.ANDROID_KEY_ALIAS }}" > dist/meta/signing.txt; then
+            # Use sed/head pipelines that do not fail under set -e -o pipefail
+            alias=$(sed -n 's/^Alias name: //p' dist/meta/signing.txt | head -n1)
+            sha256=$(sed -n 's/^SHA-256: //p' dist/meta/signing.txt | head -n1)
+            sha1=$(sed -n 's/^SHA1: //p' dist/meta/signing.txt | head -n1)
+            md5=$(sed -n 's/^MD5: //p' dist/meta/signing.txt | head -n1)
+            printf '{\n  "alias": "%s",\n  "sha256": "%s",\n  "sha1": "%s",\n  "md5": "%s",\n  "generatedAt": "%s"\n}\n' "$alias" "$sha256" "$sha1" "$md5" "$(date -Iseconds)" > dist/meta/signing-metadata.json
+          else
+            echo "keytool listing failed; writing minimal signing-metadata.json and continuing."
+            printf '{\n  "alias": "",\n  "sha256": "",\n  "sha1": "",\n  "md5": "",\n  "error": "keytool failed",\n  "generatedAt": "%s"\n}\n' "$(date -Iseconds)" > dist/meta/signing-metadata.json
+          fi
+      - name: Generate artifacts manifest and release notes
+        shell: bash
+        run: |
+          set -e
+          mkdir -p dist/meta
+          node <<'EOF'
+          const fs=require('fs'); const path=require('path'); const cp=require('child_process');
+          const base='android/app/build/outputs';
+          const files=[];
+          function collect(dir) {
+            if (!fs.existsSync(dir)) return;
+            for (const f of fs.readdirSync(dir)) {
+              const full=path.join(dir,f);
+              const stat=fs.statSync(full);
+              if (stat.isDirectory()) collect(full);
+              else if (/(\.apk|\.aab)$/.test(f) && /^mood-flow-/.test(f)) files.push(full);
+            }
+          }
+          collect(path.join(base,'apk'));
+          collect(path.join(base,'bundle'));
+          const items = files.map(f => {
+            const rel = path.relative(process.cwd(), f);
+            const size = fs.statSync(f).size;
+            const ext = path.extname(f).slice(1);
+            const bn = path.basename(f);
+            const m = bn.match(/^mood-flow-([^-]+)-([^-]+)-([^-]+)(?:-([^-]+))?/);
+            const version = m ? m[1] : '';
+            const label = m ? m[2] : '';
+            const date = m ? m[3] : '';
+            const sha256 = readHash(f + '.sha256');
+            const sha1 = readHash(f + '.sha1');
+            const md5 = readHash(f + '.md5');
+            return { file: rel, ext, size, version, label, date, sha256, sha1, md5 };
+            function readHash(p) {
+              try {
+                const t = fs.readFileSync(p,'utf8').trim();
+                const first = t.split(/\s+/)[0];
+                return first;
+              } catch(e) { return ''; }
+            }
+          });
+          const runNumber = process.env.GITHUB_RUN_NUMBER || '';
+          const shaShort = (process.env.GITHUB_SHA || '').slice(0,7);
+          let signing = {};
+          try { signing = JSON.parse(fs.readFileSync('dist/meta/signing-metadata.json','utf8')); } catch(e) {}
+          // generator version is bound to tag-artifacts.cjs version in package.json (if present)
+          let generatorVersion = '1.0.0';
+          try {
+            const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
+            if (pkg && pkg.version) generatorVersion = pkg.version;
+          } catch(e) {}
+          const manifest = {
+            generatedAt: new Date().toISOString(),
+            product: 'mood-flow',
+            ci: { runNumber },
+            git: { shaShort },
+            generator: { name: 'android-ci-meta-generator', version: generatorVersion },
+            signing,
+            items
+          };
+          fs.writeFileSync('dist/meta/artifacts-manifest.json', JSON.stringify(manifest, null, 2));
+          // Release notes include manifest key info
+          const tag = process.env.GITHUB_REF_NAME || '';
+          let prev = '';
+          try { prev = cp.execSync('git describe --tags --abbrev=0 HEAD^', {stdio:['ignore','pipe','ignore']}).toString().trim(); } catch(e) {}
+          let log = '';
+          try {
+            const range = prev ? `${prev}..HEAD` : '';
+            log = cp.execSync(`git log --pretty=format:"- %s (%h) by %an" ${range}`, {stdio:['ignore','pipe','ignore']}).toString();
+          } catch(e) {}
+          const byLabel = items.reduce((acc, it) => { (acc[it.label] ||= []).push(it); return acc; }, {});
+          let notes = `# Release ${tag}\n\n## Build Metadata\n- Product: ${manifest.product}\n- CI Run: ${runNumber}\n- SHA: ${shaShort}\n- Generator: ${manifest.generator.name} v${manifest.generator.version}\n`;
+          if (signing.alias) notes += `- Signing Alias: ${signing.alias}\n`;
+          notes += `\n## Artifacts Summary\n`;
+          for (const [lbl, arr] of Object.entries(byLabel)) {
+            notes += `\n### ${lbl} (${arr.length})\n`;
+            for (const it of arr) notes += `- ${it.file} [${it.ext}] (size: ${it.size})\n`;
+          }
+          notes += `\nChecksums: Each artifact includes .sha256/.sha1/.md5 files.\n`;
+          notes += `\n## Changes Since ${prev || 'initial'}\n${log}\n`;
+          fs.writeFileSync('dist/meta/release-notes.md', notes);
+          EOF
+      - name: Validate meta JSON (SBOM & Manifest) with AJV
+        shell: bash
+        run: |
+          set -e
+          npx --yes ajv-cli@5.0.0 validate -s .github/schemas/artifacts-manifest.schema.json -d dist/meta/artifacts-manifest.json
+          npx --yes ajv-cli@5.0.0 validate -s .github/schemas/sbom-cyclonedx-simple.schema.json -d dist/meta/sbom-npm.json
+      - name: Validate SBOM with CycloneDX CLI (strict)
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -e
+          curl -sL https://github.com/CycloneDX/cyclonedx-cli/releases/latest/download/cyclonedx-linux-x64 -o cyclonedx
+          chmod +x cyclonedx
+          ./cyclonedx validate --input-file dist/meta/sbom-npm.json --input-format json --fail-on-errors || {
+            echo "CycloneDX strict validation failed; recording warning and continuing.";
+          }
+      - name: Copy JSON Schemas into meta artifact
+        shell: bash
+        run: |
+          set -e
+          mkdir -p dist/meta/schema
+          cp .github/schemas/*.json dist/meta/schema/
+      - name: Upload SBOM/Manifest/Signing/Notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: meta-sbom-and-manifest
+          path: dist/meta/**
+          retention-days: 30
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload Tagged Release APKs
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-release-tagged
+          path: |
+            android/app/build/outputs/apk/release/mood-flow-*-release-*.apk
+            android/app/build/outputs/apk/release/mood-flow-*-signed-*.apk
+            android/app/build/outputs/apk/release/mood-flow-*-sinternal-*.apk
+            android/app/build/outputs/apk/release/mood-flow-*-store-*.apk
+            # Fallback to generic outputs when tagging did not produce labeled files
+            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/apk/release/mood-flow-*.apk.sha256
+            android/app/build/outputs/apk/release/mood-flow-*.apk.sha1
+            android/app/build/outputs/apk/release/mood-flow-*.apk.md5
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload Tagged Release AABs (all labels)
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-aab-release-tagged
+          path: |
+            android/app/build/outputs/bundle/release/mood-flow-*-release-*.aab
+            android/app/build/outputs/bundle/release/mood-flow-*-signed-*.aab
+            android/app/build/outputs/bundle/release/mood-flow-*-sinternal-*.aab
+            android/app/build/outputs/bundle/release/mood-flow-*-store-*.aab
+            # Fallback to generic outputs when tagging did not produce labeled files
+            android/app/build/outputs/bundle/release/app-release.aab
+            android/app/build/outputs/bundle/release/mood-flow-*.aab.sha256
+            android/app/build/outputs/bundle/release/mood-flow-*.aab.sha1
+            android/app/build/outputs/bundle/release/mood-flow-*.aab.md5
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload Store AAB (for app store submission)
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-aab-store-only
+          path: |
+            android/app/build/outputs/bundle/release/mood-flow-*-store-*.aab
+            android/app/build/outputs/bundle/release/mood-flow-*-store-*.aab.sha256
+            android/app/build/outputs/bundle/release/mood-flow-*-store-*.aab.sha1
+            android/app/build/outputs/bundle/release/mood-flow-*-store-*.aab.md5
+          if-no-files-found: warn
+          retention-days: 30
+
+  publish-release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build-android
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download APK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk-release-tagged
+          path: dist/apk
+      - name: Download AAB artifacts (all labels)
+        uses: actions/download-artifact@v4
+        with:
+          name: android-aab-release-tagged
+          path: dist/aab
+      - name: Download Store AAB (single)
+        uses: actions/download-artifact@v4
+        with:
+          name: android-aab-store-only
+          path: dist/aab-store
+      - name: Download Meta artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: meta-sbom-and-manifest
+          path: dist/meta
+      - name: Publish GitHub Release with assets
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          body_path: dist/meta/release-notes.md
+          # Avoid duplicate uploads: store-labeled AABs are already included in dist/aab/**
+          # Allow unmatched globs to be skipped without failing the job
+          fail_on_unmatched_files: false
+          files: |
+            dist/apk/**
+            dist/aab/**
+            dist/meta/**
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

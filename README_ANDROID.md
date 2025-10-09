@@ -68,6 +68,26 @@ cd android && ./gradlew assembleDebug
 - 在 Actions 的 Artifacts 中下载：`android-apk-release-tagged`、`android-aab-release-tagged`、`android-aab-store-only`、`meta-sbom-and-manifest`
 - 本地生成标签副本：`node scripts/tag-artifacts.cjs --labels "sinternal,store" --product mood-flow`
 
+### 一键推送/打标签并监控 CI 运行
+
+- 新增脚本：`npm run ci:push`
+  - 功能：自动提交未保存更改、推送到当前分支、生成/更新标签（默认 `v{versionName}-ci{N}`）、推送标签触发 CI，并轮询对应的 Actions 运行，输出运行链接与结论。
+  - 用法（基础）：
+    ```bash
+    npm run ci:push
+    ```
+  - 用法（带参数）：
+    ```bash
+    # 传入 commit 信息与指定标签（通过 -- 传递 PowerShell 参数）
+    npm run ci:push -- -CommitMessage "chore(ci): trigger build" -Tag v1.1.96-ci8 -WaitSeconds 300
+    # 指定分支（默认为当前分支或 main）
+    npm run ci:push -- -Branch main
+    ```
+  - 运行结果摘要保存：`scripts/.ci-last-run.json`
+  - 环境要求：
+    - 读取 GitHub Actions 状态需要令牌：设置环境变量 `GITHUB_TOKEN`（需具备 `repo` 与 `actions:read` 权限），或已登录 `gh` CLI。
+    - 未配置令牌时，脚本仍会完成推送/打标签，并提供通用的 Actions 列表页链接。
+
 ### Cloudflare R2 自动发布（APK 更新源）
 
 - 构建完成后，工作流会自动选择 `mood-flow-*-store-*.apk`（若无则回退到 `*-release-*`）上传至 Cloudflare R2。
