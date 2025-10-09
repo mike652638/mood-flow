@@ -254,11 +254,13 @@ jobs:
         run: |
           set -e
           mkdir -p dist/meta
-          if keytool -list -v -keystore android/app/keystore/release.keystore -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" -alias "${{ secrets.ANDROID_KEY_ALIAS }}" -keypass "${{ secrets.ANDROID_KEY_PASSWORD }}" > dist/meta/signing.txt; then
-            alias=$(grep -m1 '^Alias name:' dist/meta/signing.txt | sed 's/.*: //')
-            sha256=$(grep -m1 'SHA-256:' dist/meta/signing.txt | awk '{print $2}')
-            sha1=$(grep -m1 'SHA1:' dist/meta/signing.txt | awk '{print $2}')
-            md5=$(grep -m1 'MD5:' dist/meta/signing.txt | awk '{print $2}')
+          # Force predictable English output to match parsing patterns
+          if LC_ALL=C keytool -list -v -keystore android/app/keystore/release.keystore -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" -alias "${{ secrets.ANDROID_KEY_ALIAS }}" -keypass "${{ secrets.ANDROID_KEY_PASSWORD }}" > dist/meta/signing.txt; then
+            # Use sed/head pipelines that do not fail under set -e -o pipefail
+            alias=$(sed -n 's/^Alias name: //p' dist/meta/signing.txt | head -n1)
+            sha256=$(sed -n 's/^SHA-256: //p' dist/meta/signing.txt | head -n1)
+            sha1=$(sed -n 's/^SHA1: //p' dist/meta/signing.txt | head -n1)
+            md5=$(sed -n 's/^MD5: //p' dist/meta/signing.txt | head -n1)
             printf '{\n  "alias": "%s",\n  "sha256": "%s",\n  "sha1": "%s",\n  "md5": "%s",\n  "generatedAt": "%s"\n}\n' "$alias" "$sha256" "$sha1" "$md5" "$(date -Iseconds)" > dist/meta/signing-metadata.json
           else
             echo "keytool listing failed; writing minimal signing-metadata.json and continuing."
