@@ -223,11 +223,16 @@ jobs:
           echo "Running: ${CMD[*]}"
           "${CMD[@]}"
 
-      - name: Commit updates.json back to repo (non-PR runs)
-        if: ${{ env.R2_URL != '' && github.event_name != 'pull_request' }}
+      - name: Commit updates.json back to repo (branch runs only)
+        if: ${{ env.R2_URL != '' && github.event_name != 'pull_request' && startsWith(github.ref, 'refs/heads/') }}
         shell: bash
         run: |
           set -e
+          # Extra safety: skip when on detached HEAD (e.g., tag runs)
+          if [ "$(git rev-parse --abbrev-ref HEAD)" = "HEAD" ]; then
+            echo "Detached HEAD detected (tag run); skip committing updates.json"
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add public/updates.json
