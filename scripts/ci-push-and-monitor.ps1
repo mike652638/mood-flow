@@ -322,8 +322,16 @@ try {
   while ((Get-Date) -lt $deadline) {
     $runs = Get-Run-ByHeadSha -Owner $owner -Repo $repo -Sha $sha -Token $token
     if ($runs -and $runs.Count -gt 0) {
-      $run = $runs[0]
-      Write-Info ("Found run: run_id=" + $run.id + ", status=" + $run.status + " (elapsed " + (Get-ElapsedStr $monitorStart) + ")")
+      # Prefer Build Android APK workflow if present
+      $pref = $runs | Where-Object { $_.name -eq 'Build Android APK' }
+      if ($pref -and $pref.Count -gt 0) { $run = $pref[0] } else { $run = $runs[0] }
+      Write-Info ("Found run: run_id=" + $run.id + ", name=" + $run.name + ", status=" + $run.status + " (elapsed " + (Get-ElapsedStr $monitorStart) + ")")
+      # If we picked a non-target workflow that already completed, keep waiting for the target one
+      if ($run.name -ne 'Build Android APK') {
+        $run = $null
+        Start-Sleep -Seconds $PollIntervalSeconds
+        continue
+      }
       break
     }
     # Fallback with gh CLI (in case REST indexing or filter fails)

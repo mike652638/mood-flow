@@ -1,0 +1,16 @@
+name: Test Tag Trigger (noop)
+
+on:
+  workflow_dispatch:
+    inputs:
+      note:
+        description: 'Optional note'
+        type: string
+        required: false
+
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: No-op
+        run: echo "This workflow is a no-op placeholder."

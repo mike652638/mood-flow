@@ -2,24 +2,17 @@
     "ok":  true,
     "tag":  "v1.2.2",
     "branch":  "main",
-    "head_sha":  "2a2130d62538db596ec26f41003cd182c9123c15",
-    "run_id":  18387405072,
-    "run_number":  72,
+    "head_sha":  "e92df68941a5ff6bfae59fbe2dc7d83bb2e39da9",
+    "run_id":  18387768184,
+    "run_number":  25,
     "status":  "completed",
     "conclusion":  "failure",
-    "html_url":  "https://github.com/mike652638/mood-flow/actions/runs/18387405072",
-    "workflow_name":  "Build Android APK",
-    "workflow_path":  ".github/workflows/build-android.yml",
-    "jobs":  [
-                 {
-                     "status":  "completed",
-                     "name":  "build-android",
-                     "conclusion":  "failure"
-                 },
-                 {
-                     "status":  "completed",
-                     "name":  "publish-release",
-                     "conclusion":  "skipped"
-                 }
-             ]
+    "html_url":  "https://github.com/mike652638/mood-flow/actions/runs/18387768184",
+    "workflow_name":  ".github/workflows/test-tag-trigger.yml",
+    "workflow_path":  ".github/workflows/test-tag-trigger.yml",
+    "jobs":  {
+
+             },
+    "release_url":  "https://github.com/mike652638/mood-flow/releases/tag/v1.2.2",
+    "r2_apk_url":  null
 }
