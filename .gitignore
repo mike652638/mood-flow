@@ -26,7 +26,9 @@ dist-ssr
 
 # Android sensitive files
 android/keystore.properties
-android/app/keystore/
 *.jks
 *.keystore
 android/local.properties
+android/app/keystore/keystore.properties
+android/app/keystore/release.keystore
+android/app/keystore/keystore.b64
