@@ -62,7 +62,7 @@ const ImmersiveStatusBar: React.FC<ImmersiveStatusBarProps> = ({
       document.documentElement.style.setProperty('--status-bar-height', `${finalStatusBar}px`);
       const headerHeight = 56;
       document.documentElement.style.setProperty('--header-height', `${headerHeight}px`);
-      const extraTop = immersive ? 32 : 4;
+      const extraTop = immersive ? 8 : 0;
       document.documentElement.style.setProperty('--safe-area-extra-top', `${extraTop}px`);
     } catch (error) {
       console.error('Failed to set status bar properties:', error);

@@ -138,8 +138,16 @@ function ensureArray(str, def = []) {
     found++;
     const dir = path.dirname(src.file);
     const ext = src.kind === 'apk' ? '.apk' : '.aab';
+    // Enforce flavor-aware label strategy:
+    // - release flavor: allow release/signed/store
+    // - debug flavor: allow sinternal only
+    const allowed = new Set(
+      src.flavor === 'release'
+        ? ['release', 'signed', 'store']
+        : ['sinternal']
+    );
 
-    for (const label of labels) {
+    for (const label of labels.filter(l => allowed.has(l))) {
       const targetName = `${product}-${versionName}-${label}-${dateStamp}${ciSuffix}${ext}`;
       const targetPath = path.join(dir, targetName);
 

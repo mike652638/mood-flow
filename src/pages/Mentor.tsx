@@ -13,7 +13,25 @@ import { useNetworkStatus } from '../hooks/useMobile';
 import { cn } from '../utils/cn';
 import { chatPresetGroups } from '../constants/presets';
 
-const personaPrompt = `你是一位温暖、稳重的 AI 情绪疏导师，擅长以共情与结构化方法引导用户进行情绪调节、认知重构与复盘成长。请避免医疗诊断或治疗承诺，遵守安全与隐私，提供可执行的短练习与鼓励。`;
+const personaPrompt = `
+角色：温暖、稳重的 AI 情绪疏导师。你的目标是在当下帮助用户缓解情绪、获得清晰，并形成可持续的自助练习与反思。
+
+原则：
+- 使用中文、短句、友善且不评判；先共情再给建议。
+- 不进行医疗诊断或治疗承诺；不讨论药物或替代专业治疗。
+- 若出现自伤/他伤/严重危机信号，温柔提醒联系当地紧急热线或可信任的人，并建议立即寻求线下帮助。
+
+回应结构（按序）：
+1) 共情与归纳：用 1–2 句准确复述用户的核心感受/困扰。
+2) 微建议或练习：从“呼吸练习”“正念冥想”“感官回归”“认知重构”“情绪日记”中挑选最贴切的 1 项，给出 2–5 步的简明操作与预计时长（如 3 分钟）。可提示“点击下方按钮开始”。
+3) 追问：提出一个具体的小问题，帮助澄清诱因、需求或边界。
+4) 可保存要点：给出 1–3 条可记录到日记的关键词或句子。
+
+风格与限制：
+- 每次回复控制在 120–220 字；问题复杂时分段逐步推进。
+- 避免夸大或不确定断言；不确定就诚实说明并给出可行替代。
+- 不索取或存储敏感个人信息；尊重用户节奏与文化背景。
+`;
 
 interface ChatBubble {
   id: string;
@@ -716,7 +734,7 @@ const Mentor: React.FC = () => {
     {
       id: 'm0',
       role: 'assistant',
-      content: '你好，我在这里陪伴你。先从今天的感受开始吧：有什么让你开心或困扰的？也可以点按下方快速练习～'
+      content: '你好，我在这里陪伴你。先从今天的感受开始吧：有什么让你开心或困扰的？也可以点按下方按钮进行疏导练习～'
     }
   ]);
   const [activeTab, setActiveTab] = useState<'chat' | 'exercises'>('chat');
@@ -982,9 +1000,9 @@ const Mentor: React.FC = () => {
     <>
       <Header title='AI 情绪疏导师' immersiveMode={immersiveMode} />
       <Container className='pb-0'>
-        <div className='page-sections'>
+        <div className='page-sections space-y-6'>
           {/* 标签页导航（对齐设置页样式） */}
-          <Card variant='default' padding='sm' className='overflow-hidden'>
+          <Card variant='default' padding='sm' className='overflow-hidden p-2 sm:p-3'>
             <div
               role='tablist'
               aria-label='导师功能切换'
@@ -992,251 +1010,254 @@ const Mentor: React.FC = () => {
               className='flex space-x-2 sm:space-x-3 lg:space-x-4 xl:space-x-5 2xl:space-x-6 overflow-x-auto scrollbar-hide p-1 snap-x snap-mandatory'>
               <button
                 role='tab'
-                aria-selected={activeTab === 'chat' ? 'true' : 'false'}
+                aria-selected={activeTab === 'chat'}
                 onClick={() => setActiveTab('chat')}
-                className={`flex-1 flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3 sm:py-3.5 rounded-lg sm:rounded-xl text-xs sm:text-sm lg:text-base xl:text-lg transition-all duration-200 min-w-0 font-medium snap-start ${
+                className={`flex-1 flex flex-row items-center justify-center gap-2 px-3 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm lg:text-base xl:text-lg transition-all duration-200 min-w-0 font-semibold snap-start ${
                   activeTab === 'chat'
-                    ? 'bg-purple-500 text-white shadow-md transform scale-[1.02]'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-purple-900/30 hover:scale-[1.01]'
+                    ? 'bg-purple-500 text-white shadow-lg transform scale-[1.02]'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-purple-900/30 hover:shadow-md hover:scale-[1.01]'
                 }`}>
-                <MessageSquare className='w-5 h-5 xl:w-6 xl:h-6 flex-shrink-0' />
-                <span className='text-xs sm:text-sm lg:text-base xl:text-lg truncate whitespace-nowrap'>AI 伴聊</span>
+                <MessageSquare className='w-4 h-4 xl:w-5 xl:h-5 flex-shrink-0' />
+                <span className='text-sm sm:text-base lg:text-lg xl:text-xl font-bold truncate whitespace-nowrap'>
+                  AI 伴聊
+                </span>
               </button>
               <button
                 role='tab'
-                aria-selected={activeTab === 'exercises' ? 'true' : 'false'}
+                aria-selected={activeTab === 'exercises'}
                 onClick={() => setActiveTab('exercises')}
-                className={`flex-1 flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3 sm:py-3.5 rounded-lg sm:rounded-xl text-xs sm:text-sm lg:text-base xl:text-lg transition-all duration-200 min-w-0 font-medium snap-start ${
+                className={`flex-1 flex flex-row items-center justify-center gap-2 px-3 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm lg:text-base xl:text-lg transition-all duration-200 min-w-0 font-semibold snap-start ${
                   activeTab === 'exercises'
-                    ? 'bg-purple-500 text-white shadow-md transform scale-[1.02]'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-purple-900/30 hover:scale-[1.01]'
+                    ? 'bg-purple-500 text-white shadow-lg transform scale-[1.02]'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-purple-900/30 hover:shadow-md hover:scale-[1.01]'
                 }`}>
-                <Fingerprint className='w-5 h-5 xl:w-6 xl:h-6 flex-shrink-0' />
-                <span className='text-xs sm:text-sm lg:text-base xl:text-lg truncate whitespace-nowrap'>疏导练习</span>
+                <Fingerprint className='w-4 h-4 xl:w-5 xl:h-5 flex-shrink-0' />
+                <span className='text-sm sm:text-base lg:text-lg xl:text-xl font-bold truncate whitespace-nowrap'>
+                  疏导练习
+                </span>
               </button>
             </div>
           </Card>
+          <div className='mt-4'></div>
           {/* 根据标签页显示不同的布局 */}
           {activeTab === 'exercises' && (
-            <div className='grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 xl:gap-12 2xl:gap-16'>
+            <div className='space-y-6'>
               {/* 疏导练习区 */}
-              <div className='lg:col-span-2 xl:col-span-3 2xl:col-span-4'>
-                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6'>
-                  {/* 呼吸练习 */}
-                  <Card variant='default' padding='md'>
-                    <div className='flex items-center justify-between mb-3'>
-                      <h3 className='text-lg lg:text-xl xl:text-2xl font-semibold text-gray-900 dark:text-gray-50'>
-                        呼吸练习
-                      </h3>
-                      <div className='flex items-center gap-2'>
-                        <StatusBadge status={exerciseStatus.breath} />
-                        <button
-                          onClick={() => toggleExercise('breath')}
-                          aria-expanded={exerciseOpen.breath ? 'true' : 'false'}
-                          className='text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors'>
-                          {exerciseOpen.breath ? '收起' : '展开'}
-                        </button>
-                      </div>
+              <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6'>
+                {/* 呼吸练习 */}
+                <Card variant='default' padding='md'>
+                  <div className='flex items-center justify-between mb-3'>
+                    <h3 className='text-lg lg:text-xl xl:text-2xl font-semibold text-gray-900 dark:text-gray-50'>
+                      呼吸练习
+                    </h3>
+                    <div className='flex items-center gap-2'>
+                      <StatusBadge status={exerciseStatus.breath} />
+                      <button
+                        onClick={() => toggleExercise('breath')}
+                        aria-expanded={exerciseOpen.breath}
+                        className='text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors'>
+                        {exerciseOpen.breath ? '收起' : '展开'}
+                      </button>
                     </div>
-                    {exerciseOpen.breath && (
-                      <>
-                        <p className='text-sm text-gray-700 dark:text-gray-200 mb-3'>
-                          通过节律呼吸快速调节身心，降低紧张与压力。
-                        </p>
-                        <div className='flex flex-wrap gap-2'>
-                          <button
-                            onClick={() => {
-                              setBreathParams({ totalSeconds: 180, pace: { inhale: 4, hold: 4, exhale: 6 } });
-                              markInProgress('breath');
-                              setShowBreath(true);
-                            }}
-                            className='h-9 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-500 active:scale-95'>
-                            启动 3 分钟呼吸
-                          </button>
-                          <button
-                            onClick={() => {
-                              setBreathParams({ totalSeconds: 300, pace: { inhale: 5, hold: 5, exhale: 7 } });
-                              markInProgress('breath');
-                              setShowBreath(true);
-                            }}
-                            className='h-9 px-3 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 dark:hover:bg-emerald-800/40 text-emerald-700 dark:text-emerald-200 text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-500 active:scale-95'>
-                            5 分钟·慢节律
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </Card>
-
-                  {/* 正念冥想（调整至第二位） */}
-                  <Card variant='default' padding='md'>
-                    <div className='flex items-center justify-between mb-3'>
-                      <h3 className='text-lg lg:text-xl xl:text-2xl font-semibold text-gray-900 dark:text-gray-50'>
-                        正念冥想
-                      </h3>
-                      <div className='flex items-center gap-2'>
-                        <StatusBadge status={exerciseStatus.mindfulness} />
-                        <button
-                          onClick={() => toggleExercise('mindfulness')}
-                          aria-expanded={exerciseOpen.mindfulness ? 'true' : 'false'}
-                          className='text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors'>
-                          {exerciseOpen.mindfulness ? '收起' : '展开'}
-                        </button>
-                      </div>
-                    </div>
-                    {exerciseOpen.mindfulness && (
-                      <>
-                        <p className='text-sm text-gray-700 dark:text-gray-200 mb-3'>
-                          通过引导冥想培养当下觉察，提升情绪调节能力。
-                        </p>
-                        <button
-                          onClick={() => {
-                            markInProgress('mindfulness');
-                            setShowMindfulness(true);
-                          }}
-                          className='h-9 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-500 active:scale-95'>
-                          开始 10 分钟冥想
-                        </button>
-                      </>
-                    )}
-                  </Card>
-
-                  {/* 感官回归 */}
-                  <Card variant='default' padding='md'>
-                    <div className='flex items-center justify-between mb-3'>
-                      <h3 className='text-lg lg:text-xl xl:text-2xl font-semibold text-gray-900 dark:text-gray-50'>
-                        感官回归
-                      </h3>
-                      <div className='flex items-center gap-2'>
-                        <StatusBadge status={exerciseStatus.grounding} />
-                        <button
-                          onClick={() => toggleExercise('grounding')}
-                          aria-expanded={exerciseOpen.grounding ? 'true' : 'false'}
-                          className='text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-theme-gray-700 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-theme-gray-600 transition-colors'>
-                          {exerciseOpen.grounding ? '收起' : '展开'}
-                        </button>
-                      </div>
-                    </div>
-                    {exerciseOpen.grounding && (
-                      <>
-                        <p className='text-sm text-gray-700 dark:text-gray-200 mb-3'>
-                          通过感官觉察快速回到当下，缓解焦虑与恐慌。
-                        </p>
-                        <div className='flex flex-wrap gap-2'>
-                          <button
-                            onClick={() => {
-                              setGroundingInitial(15);
-                              markInProgress('grounding');
-                              setShowGrounding(true);
-                            }}
-                            className='h-9 px-3 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-teal-300 dark:focus:ring-teal-500 active:scale-95'>
-                            快速版 (15秒)
-                          </button>
-                          <button
-                            onClick={() => {
-                              setGroundingInitial(30);
-                              markInProgress('grounding');
-                              setShowGrounding(true);
-                            }}
-                            className='h-9 px-3 rounded-lg bg-teal-100 dark:bg-teal-900/30 hover:bg-teal-200 dark:hover:bg-teal-800/40 text-teal-700 dark:text-teal-200 text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-teal-300 dark:focus:ring-teal-500 active:scale-95'>
-                            标准版 (30秒)
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </Card>
-
-                  {/* 认知重构（调整至第四位） */}
-                  <Card variant='default' padding='md' className='mb-4 sm:mb-4'>
-                    <div className='flex items-center justify-between mb-3'>
-                      <h3 className='text-lg lg:text-xl xl:text-2xl font-semibold text-gray-900 dark:text-gray-50'>
-                        认知重构
-                      </h3>
-                      <div className='flex items-center gap-2'>
-                        <StatusBadge status={exerciseStatus.reframe} />
-                        <button
-                          onClick={() => toggleExercise('reframe')}
-                          aria-expanded={exerciseOpen.reframe ? 'true' : 'false'}
-                          className='text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors'>
-                          {exerciseOpen.reframe ? '收起' : '展开'}
-                        </button>
-                      </div>
-                    </div>
-                    {exerciseOpen.reframe && (
-                      <>
-                        <p className='text-sm text-gray-700 dark:text-gray-200 mb-3'>
-                          识别自动化想法，生成更平衡的替代陈述，缓解负面情绪。
-                        </p>
-                        <button
-                          onClick={() => {
-                            markInProgress('reframe');
-                            setShowReframe(true);
-                          }}
-                          className='h-9 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-500 active:scale-95'>
-                          开始认知重构
-                        </button>
-                      </>
-                    )}
-                  </Card>
-
-                  {/* 情绪日记（暂时隐藏） */}
-                  {JOURNAL_ENABLED && (
-                    <Card variant='default' padding='md'>
-                      <div className='flex items-center justify-between mb-3'>
-                        <h3 className='text-lg lg:text-xl xl:text-2xl font-semibold text-gray-900 dark:text-gray-50'>
-                          情绪日记
-                        </h3>
-                        <div className='flex items-center gap-2'>
-                          <StatusBadge status={exerciseStatus.journal} />
-                          <button
-                            onClick={() => toggleExercise('journal')}
-                            aria-expanded={exerciseOpen.journal ? 'true' : 'false'}
-                            className='text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-theme-gray-700 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-theme-gray-600 transition-colors'>
-                            {exerciseOpen.journal ? '收起' : '展开'}
-                          </button>
-                        </div>
-                      </div>
-                      {exerciseOpen.journal && (
-                        <>
-                          <p className='text-sm text-gray-700 dark:text-gray-200 mb-3'>
-                            记录当前情绪状态，识别触发因素和应对策略。
-                          </p>
-                          <button
-                            onClick={() => {
-                              markInProgress('journal');
-                              setShowEmotionJournal(true);
-                            }}
-                            className='h-9 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 active:scale-95'>
-                            写情绪日记
-                          </button>
-                        </>
-                      )}
-                    </Card>
-                  )}
-                </div>
-
-                {/* 安全与免责声明 */}
-                <Card variant='default' padding='md' className='mt-2'>
-                  <div className='flex items-center gap-2 text-red-600 mb-2'>
-                    <ShieldAlert className='w-4 h-4 sm:w-5 sm:h-5' />
-                    <span className='text-sm sm:text-base font-semibold'>安全与免责声明</span>
                   </div>
-                  <p className='text-sm sm:text-base text-gray-500 leading-relaxed'>
-                    本页面提供一般性自助支持与练习，不构成医疗建议。若你处于危机或有自伤他伤等紧急风险，请立即联系当地紧急热线或专业机构。
-                  </p>
+                  {exerciseOpen.breath && (
+                    <>
+                      <p className='text-sm text-gray-700 dark:text-gray-200 mb-3'>
+                        通过节律呼吸快速调节身心，降低紧张与压力。
+                      </p>
+                      <div className='flex flex-wrap gap-2'>
+                        <button
+                          onClick={() => {
+                            setBreathParams({ totalSeconds: 180, pace: { inhale: 4, hold: 4, exhale: 6 } });
+                            markInProgress('breath');
+                            setShowBreath(true);
+                          }}
+                          className='h-9 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-500 active:scale-95'>
+                          启动 3 分钟呼吸
+                        </button>
+                        <button
+                          onClick={() => {
+                            setBreathParams({ totalSeconds: 300, pace: { inhale: 5, hold: 5, exhale: 7 } });
+                            markInProgress('breath');
+                            setShowBreath(true);
+                          }}
+                          className='h-9 px-3 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 dark:hover:bg-emerald-800/40 text-emerald-700 dark:text-emerald-200 text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-500 active:scale-95'>
+                          5 分钟·慢节律
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </Card>
+
+                {/* 正念冥想（调整至第二位） */}
+                <Card variant='default' padding='md'>
+                  <div className='flex items-center justify-between mb-3'>
+                    <h3 className='text-lg lg:text-xl xl:text-2xl font-semibold text-gray-900 dark:text-gray-50'>
+                      正念冥想
+                    </h3>
+                    <div className='flex items-center gap-2'>
+                      <StatusBadge status={exerciseStatus.mindfulness} />
+                      <button
+                        onClick={() => toggleExercise('mindfulness')}
+                        aria-expanded={exerciseOpen.mindfulness}
+                        className='text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors'>
+                        {exerciseOpen.mindfulness ? '收起' : '展开'}
+                      </button>
+                    </div>
+                  </div>
+                  {exerciseOpen.mindfulness && (
+                    <>
+                      <p className='text-sm text-gray-700 dark:text-gray-200 mb-3'>
+                        通过引导冥想培养当下觉察，提升情绪调节能力。
+                      </p>
+                      <button
+                        onClick={() => {
+                          markInProgress('mindfulness');
+                          setShowMindfulness(true);
+                        }}
+                        className='h-9 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-500 active:scale-95'>
+                        开始 10 分钟冥想
+                      </button>
+                    </>
+                  )}
+                </Card>
+
+                {/* 感官回归 */}
+                <Card variant='default' padding='md'>
+                  <div className='flex items-center justify-between mb-3'>
+                    <h3 className='text-lg lg:text-xl xl:text-2xl font-semibold text-gray-900 dark:text-gray-50'>
+                      感官回归
+                    </h3>
+                    <div className='flex items-center gap-2'>
+                      <StatusBadge status={exerciseStatus.grounding} />
+                      <button
+                        onClick={() => toggleExercise('grounding')}
+                        aria-expanded={exerciseOpen.grounding}
+                        className='text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-theme-gray-700 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-theme-gray-600 transition-colors'>
+                        {exerciseOpen.grounding ? '收起' : '展开'}
+                      </button>
+                    </div>
+                  </div>
+                  {exerciseOpen.grounding && (
+                    <>
+                      <p className='text-sm text-gray-700 dark:text-gray-200 mb-3'>
+                        通过感官觉察快速回到当下，缓解焦虑与恐慌。
+                      </p>
+                      <div className='flex flex-wrap gap-2'>
+                        <button
+                          onClick={() => {
+                            setGroundingInitial(15);
+                            markInProgress('grounding');
+                            setShowGrounding(true);
+                          }}
+                          className='h-9 px-3 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-teal-300 dark:focus:ring-teal-500 active:scale-95'>
+                          快速版 (15秒)
+                        </button>
+                        <button
+                          onClick={() => {
+                            setGroundingInitial(30);
+                            markInProgress('grounding');
+                            setShowGrounding(true);
+                          }}
+                          className='h-9 px-3 rounded-lg bg-teal-100 dark:bg-teal-900/30 hover:bg-teal-200 dark:hover:bg-teal-800/40 text-teal-700 dark:text-teal-200 text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-teal-300 dark:focus:ring-teal-500 active:scale-95'>
+                          标准版 (30秒)
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </Card>
+
+                {/* 认知重构（调整至第四位） */}
+                <Card variant='default' padding='md'>
+                  <div className='flex items-center justify-between mb-3'>
+                    <h3 className='text-lg lg:text-xl xl:text-2xl font-semibold text-gray-900 dark:text-gray-50'>
+                      认知重构
+                    </h3>
+                    <div className='flex items-center gap-2'>
+                      <StatusBadge status={exerciseStatus.reframe} />
+                      <button
+                        onClick={() => toggleExercise('reframe')}
+                        aria-expanded={exerciseOpen.reframe ? 'true' : 'false'}
+                        className='text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors'>
+                        {exerciseOpen.reframe ? '收起' : '展开'}
+                      </button>
+                    </div>
+                  </div>
+                  {exerciseOpen.reframe && (
+                    <>
+                      <p className='text-sm text-gray-700 dark:text-gray-200 mb-3'>
+                        识别自动化想法，生成更平衡的替代陈述，缓解负面情绪。
+                      </p>
+                      <button
+                        onClick={() => {
+                          markInProgress('reframe');
+                          setShowReframe(true);
+                        }}
+                        className='h-9 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-500 active:scale-95'>
+                        开始认知重构
+                      </button>
+                    </>
+                  )}
+                </Card>
+
+                {/* 情绪日记（暂时隐藏） */}
+                {JOURNAL_ENABLED && (
+                  <Card variant='default' padding='md'>
+                    <div className='flex items-center justify-between mb-3'>
+                      <h3 className='text-lg lg:text-xl xl:text-2xl font-semibold text-gray-900 dark:text-gray-50'>
+                        情绪日记
+                      </h3>
+                      <div className='flex items-center gap-2'>
+                        <StatusBadge status={exerciseStatus.journal} />
+                        <button
+                          onClick={() => toggleExercise('journal')}
+                          aria-expanded={exerciseOpen.journal}
+                          className='text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-theme-gray-700 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-theme-gray-600 transition-colors'>
+                          {exerciseOpen.journal ? '收起' : '展开'}
+                        </button>
+                      </div>
+                    </div>
+                    {exerciseOpen.journal && (
+                      <>
+                        <p className='text-sm text-gray-700 dark:text-gray-200 mb-3'>
+                          记录当前情绪状态，识别触发因素和应对策略。
+                        </p>
+                        <button
+                          onClick={() => {
+                            markInProgress('journal');
+                            setShowEmotionJournal(true);
+                          }}
+                          className='h-9 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 active:scale-95'>
+                          写情绪日记
+                        </button>
+                      </>
+                    )}
+                  </Card>
+                )}
               </div>
+
+              {/* 安全与免责声明 */}
+              <Card variant='default' padding='md'>
+                <div className='flex items-center gap-2 text-red-600 mb-2'>
+                  <ShieldAlert className='w-4 h-4 sm:w-5 sm:h-5' />
+                  <span className='text-sm sm:text-base font-semibold'>安全与免责声明</span>
+                </div>
+                <p className='text-sm sm:text-base text-gray-500 leading-relaxed'>
+                  本页面提供一般性自助支持与练习，不构成医疗建议。若你处于危机或有自伤他伤等紧急风险，请立即联系当地专业医疗或心理咨询机构。
+                </p>
+              </Card>
             </div>
           )}
         </div>
 
         {/* 右侧：对话区（仅在 AI 伴聊标签显示） */}
         {activeTab === 'chat' && (
-          <div className={`lg:col-span-2 xl:col-span-3 2xl:col-span-4 flex flex-col xl:order-2 order-1`}>
+          <div className='space-y-6'>
             {lastError && !isSending && (
               <Card
                 variant='default'
                 padding='sm'
-                className='mb-3 border border-red-200 dark:border-red-800 bg-red-50/60 dark:bg-red-900/20'>
+                className='border border-red-200 dark:border-red-800 bg-red-50/60 dark:bg-red-900/20'>
                 <div className='text-sm sm:text-base text-red-700 dark:text-red-300'>发生错误：{lastError}</div>
                 <div className='text-sm text-gray-500 dark:text-gray-400 mt-1'>
                   网络：{isOnline ? connectionType || 'unknown' : '离线'}
@@ -1260,8 +1281,8 @@ const Mentor: React.FC = () => {
               padding='md'
               className={
                 hasConversation
-                  ? 'flex-1 min-h-[55svh] sm:min-h-[60svh] lg:min-h-[420px] mb-4 sm:mb-6'
-                  : 'mx-auto w-full min-h-[220px] mb-4 sm:mb-6'
+                  ? 'flex-1 min-h-[55svh] sm:min-h-[60svh] lg:min-h-[420px]'
+                  : 'mx-auto w-full min-h-[220px]'
               }>
               <div
                 ref={scrollRef}
@@ -1294,36 +1315,29 @@ const Mentor: React.FC = () => {
                       {m.content.split(/\n\n+/).map((seg, i) => (
                         <p key={i} className='mb-2 whitespace-pre-wrap leading-relaxed xl:leading-loose'>
                           {seg}
-                          {m.role === 'assistant' && (
-                            <button
-                              onClick={() => saveCustomTextToDiary(seg)}
-                              className='ml-2 text-sm h-8 sm:h-9 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-theme-gray-800 hover:bg-gray-200 dark:hover:bg-theme-gray-700 text-gray-600 dark:text-gray-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-theme-gray-600 active:scale-95'>
-                              保存此段
-                            </button>
-                          )}
                         </p>
                       ))}
                     </div>
                     {m.streaming && (
-                      <div className='mt-1 text-xs sm:text-sm text-gray-400 dark:text-gray-500'>正在生成...</div>
+                      <div className='mt-2 text-xs sm:text-sm text-gray-400 dark:text-gray-500'>正在生成...</div>
                     )}
                     {m.streaming && (
                       <div
-                        className='mt-1 h-1.5 sm:h-2 w-20 sm:w-24 rounded-full bg-gray-200 dark:bg-theme-gray-700 animate-pulse'
+                        className='mt-2 h-1.5 sm:h-2 w-20 sm:w-24 rounded-full bg-gray-200 dark:bg-theme-gray-700 animate-pulse'
                         aria-hidden='true'
                         aria-busy='true'
                       />
                     )}
                     {/* 执行练习快捷按钮（参数化） */}
                     {m.role === 'assistant' && (
-                      <div className='mt-2 flex flex-wrap gap-1.5 sm:gap-2'>
+                      <div className='mt-3 flex flex-wrap gap-2'>
                         <button
                           onClick={() => {
                             setBreathParams({ totalSeconds: 180, pace: { inhale: 4, hold: 4, exhale: 6 } });
                             setShowBreath(true);
                           }}
                           className='h-8 sm:h-9 px-2 py-1 rounded-lg text-sm bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-800/40 text-blue-700 dark:text-blue-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-700 active:scale-95'>
-                          呼吸(3分钟)
+                          呼吸练习 · 3分钟
                         </button>
                         <button
                           onClick={() => {
@@ -1331,21 +1345,20 @@ const Mentor: React.FC = () => {
                             setShowBreath(true);
                           }}
                           className='h-8 sm:h-9 px-2 py-1 rounded-lg text-sm bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-800/40 text-blue-700 dark:text-blue-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-700 active:scale-95'>
-                          呼吸(5分钟·慢)
+                          呼吸练习 · 5分钟（慢）
                         </button>
-                        {/* 去重：移除重复的快捷按钮 */}
                         <button
                           onClick={() => setShowReframe(true)}
                           className='h-8 sm:h-9 px-2 py-1 rounded-lg text-sm bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-800/40 text-purple-700 dark:text-purple-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-700 active:scale-95'>
-                          认知重构
+                          认知重构练习
                         </button>
                         <button
                           onClick={() => {
                             setGroundingInitial(15);
                             setShowGrounding(true);
                           }}
-                          className='h-7 sm:h-8 px-2 py-1 rounded-lg text-xs bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 dark:hover:bg-emerald-800/40 text-emerald-700 dark:text-emerald-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-700 active:scale-95'>
-                          Grounding(每步15s)
+                          className='h-8 sm:h-9 px-2 py-1 rounded-lg text-sm bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 dark:hover:bg-emerald-800/40 text-emerald-700 dark:text-emerald-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-700 active:scale-95'>
+                          锚定练习（每步15秒）
                         </button>
                       </div>
                     )}
@@ -1354,15 +1367,13 @@ const Mentor: React.FC = () => {
               </div>
             </Card>
 
-            {/* 间距修复：在聊天卡片与预设卡片之间加入显式间距，避免移动端塌陷 */}
-            <div className='h-4 sm:h-6' />
             {/* 预设问题：输入框上方常驻，可折叠，分组展示 */}
-            <Card variant='default' padding='sm' className='mt-0 sm:mt-0 mb-4 sm:mb-6 overflow-hidden'>
+            <Card variant='default' padding='sm' className='overflow-hidden'>
               <div className='flex items-center justify-between'>
                 <div className='text-sm sm:text-base text-gray-600 dark:text-gray-300'>试试这些问题：</div>
                 <button
                   onClick={() => setPresetOpen(prev => !prev)}
-                  aria-expanded={presetOpen ? 'true' : 'false'}
+                  aria-expanded={presetOpen}
                   className='text-sm px-2 py-1 rounded-md bg-gray-100 dark:bg-theme-gray-800 text-gray-600 dark:text-gray-300'>
                   {presetOpen ? '收起' : '展开'}
                 </button>
@@ -1372,7 +1383,7 @@ const Mentor: React.FC = () => {
                   'mt-2 sm:mt-3 transition-all duration-300 ease-in-out overflow-hidden',
                   presetOpen ? 'max-h-[900px] opacity-100' : 'max-h-0 opacity-0'
                 )}
-                aria-hidden={presetOpen ? 'false' : 'true'}>
+                aria-hidden={!presetOpen}>
                 <div className='grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 sm:gap-3 xl:gap-4 2xl:gap-5'>
                   {presetGroups.map(group => (
                     <div key={group.label} className='rounded-lg p-2 sm:p-3 xl:p-4'>
@@ -1408,7 +1419,7 @@ const Mentor: React.FC = () => {
               </div>
             </Card>
 
-            <div className='flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 mt-4 sm:mt-6 mb-4 sm:mb-4'>
+            <div className='flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3'>
               <Card variant='default' padding='sm' className='flex-1 min-w-0 order-1 sm:order-none'>
                 <input
                   value={input}
@@ -1478,7 +1489,7 @@ const Mentor: React.FC = () => {
 
             {/* 时间剩余估计（基于速率与目标长度的启发式） */}
             {isSending && (
-              <div className='flex items-center gap-3 text-xs text-gray-500 animate-pulse mt-2'>
+              <div className='flex items-center gap-3 text-xs text-gray-500 animate-pulse'>
                 <div className='flex gap-1'>
                   <div
                     className='w-1 h-1 bg-purple-500 rounded-full animate-bounce'
@@ -1504,13 +1515,13 @@ const Mentor: React.FC = () => {
             )}
 
             {/* 移动端安全声明 */}
-            <Card variant='default' padding='sm' className='xl:hidden mt-2'>
+            <Card variant='default' padding='sm' className='xl:hidden'>
               <div className='flex items-center gap-2 text-red-600 mb-2'>
                 <ShieldAlert className='w-4 h-4 sm:w-5 sm:h-5' />
                 <span className='text-sm sm:text-base font-semibold'>安全与免责声明</span>
               </div>
               <p className='text-sm sm:text-base text-gray-500 leading-relaxed'>
-                本页面提供一般性自助支持与练习，不构成医疗建议。若你处于危机或有自伤他伤等紧急风险，请立即联系当地紧急热线或专业机构。
+                本页面提供一般性自助支持与练习，不构成医疗建议。若你处于危机或有自伤他伤等紧急风险，请立即联系当地专业医疗或心理咨询机构。
               </p>
             </Card>
           </div>

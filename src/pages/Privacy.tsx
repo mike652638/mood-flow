@@ -12,7 +12,7 @@ const Privacy = () => {
       <Header title='隐私政策' showBackButton={true} immersiveMode={immersiveMode} />
       <Container
         className={`${
-          immersiveMode ? 'pt-safe-area-and-header' : 'pt-16 sm:pt-20 md:pt-24 lg:pt-24 xl:pt-24 2xl:pt-24'
+          immersiveMode ? 'pt-safe-area-and-header-policy' : 'pt-policy-pages-fallback'
         }`}>
         <div className='mb-4 space-y-6 lg:space-y-8 pt-4 sm:pt-6'>
           {/* 内容 */}

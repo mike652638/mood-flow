@@ -1,5 +1,6 @@
 /* 引入组件样式入口（使用 SCSS 设计变量与混入） */
 @use './styles/components';
+@use './styles/policy-pages';
 
 /* Editor hint: Tailwind directives are handled by the Tailwind compiler. Safe to ignore IDE warnings about unknown at-rules. */
 @tailwind base;

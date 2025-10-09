@@ -1,0 +1,45 @@
+/* 服务条款和隐私政策页面专用样式 */
+
+/* 为服务条款和隐私政策页面增加额外的顶部间距，避免标题被挖孔屏遮挡 */
+.pt-safe-area-and-header-policy {
+  /* 为状态栏 + 固定 Header 共同预留顶部空间，并为政策页面增加额外间距 */
+  padding-top: calc(
+    max(env(safe-area-inset-top, 0px), var(--status-bar-height, 24px)) + var(--header-height, 56px) +
+      var(--safe-area-extra-top, 16px)
+  );
+}
+
+/* 非沉浸模式下的政策页面顶部间距 */
+.pt-policy-pages-fallback {
+  padding-top: 20px;
+}
+
+@media (min-width: 640px) {
+  .pt-policy-pages-fallback {
+    padding-top: 24px;
+  }
+}
+
+@media (min-width: 768px) {
+  .pt-policy-pages-fallback {
+    padding-top: 28px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .pt-policy-pages-fallback {
+    padding-top: 28px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .pt-policy-pages-fallback {
+    padding-top: 28px;
+  }
+}
+
+@media (min-width: 1536px) {
+  .pt-policy-pages-fallback {
+    padding-top: 28px;
+  }
+}

@@ -190,6 +190,22 @@ select {
   );
 }
 
+/* 异形屏适配 - 挖孔摄像头和刘海屏支持 */
+.safe-area-header {
+  /* 确保头部内容不被挖孔摄像头遮挡 */
+  padding-left: max(env(safe-area-inset-left), 16px);
+  padding-right: max(env(safe-area-inset-right), 16px);
+}
+
+.notch-safe-title {
+  /* 标题区域避开挖孔摄像头 */
+  margin-left: max(env(safe-area-inset-left), 0px);
+  margin-right: max(env(safe-area-inset-right), 0px);
+  /* 为挖孔摄像头预留额外空间 */
+  padding-left: max(env(safe-area-inset-left, 0px) * 0.5, 8px);
+  padding-right: max(env(safe-area-inset-right, 0px) * 0.5, 8px);
+}
+
 /* 非沉浸模式标题适配异形屏：居中并预留左右安全区，避免挖孔遮挡 */
 .notch-safe-title {
   margin-left: max(env(safe-area-inset-left), 0px);
@@ -419,7 +435,7 @@ select {
   /* 为状态栏 + 固定 Header 共同预留顶部空间（适用于存在固定头部的页面，如设置/记录/历史等） */
   padding-top: calc(
     max(env(safe-area-inset-top, 0px), var(--status-bar-height, 24px)) + var(--header-height, 56px) +
-      var(--safe-area-extra-top, 8px)
+      var(--safe-area-extra-top, 4px)
   );
 }
 

@@ -23,6 +23,14 @@ on:
         description: 'Override Android versionCode (integer)'
         type: string
         required: false
+      mandatory:
+        description: 'Force update (write mandatory=true to updates.json)'
+        type: boolean
+        default: false
+      release_notes_path:
+        description: 'Optional path to release notes markdown for summarization'
+        type: string
+        required: false
   # 优化：仅在版本标签触发（避免同时因分支推送与标签推送触发两次）
   push:
     tags: ['v*', 'v*-ci*']
@@ -104,16 +112,6 @@ jobs:
       - name: Lint (strict)
         run: npm run lint -- --max-warnings=0
 
-      - name: Build web app
-        run: npm run build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_APP_UPDATE_URL: ${{ env.VITE_APP_UPDATE_URL }}
-
-      - name: Sync Capacitor
-        run: npx cap sync android
-
       - name: Sync Android versionName/versionCode (tag/env/inputs override)
         if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
         shell: bash
@@ -182,6 +180,17 @@ jobs:
           echo "VERSION_NAME=${NEW_NAME}" >> "$GITHUB_ENV"
           echo "VERSION_CODE=${NEW_CODE}" >> "$GITHUB_ENV"
 
+      - name: Build web app
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_APP_UPDATE_URL: ${{ env.VITE_APP_UPDATE_URL }}
+          VITE_APP_VERSION: ${{ env.VERSION_NAME }}
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
       - name: Validate App IDs consistency (applicationId vs capacitor appId)
         shell: bash
         run: |
@@ -235,6 +244,49 @@ jobs:
           ls -lh app/build/outputs/apk/release/app-release.apk || true
           ls -lh app/build/outputs/bundle/release/app-release.aab || true
 
+      # Normalize mandatory input for updates.json (string true/false)
+      - name: Normalize mandatory flag
+        shell: bash
+        run: |
+          set -e
+          M_IN="${{ inputs.mandatory }}"
+          case "$M_IN" in
+            true|True|TRUE|1|yes|Yes|YES) MANDATORY_STR="true" ;;
+            false|False|FALSE|0|no|No|NO|""|) MANDATORY_STR="false" ;;
+            *) MANDATORY_STR="false" ;;
+          esac
+          echo "MANDATORY_STR=${MANDATORY_STR}" >> "$GITHUB_ENV"
+
+      - name: Publish Debug APK to R2 (sinternal) without updating updates.json
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 == '' }}
+        shell: bash
+        env:
+          R2_ACCOUNT_ID: ${{ env.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ env.R2_BUCKET }}
+          R2_PUBLIC_BASE: ${{ env.R2_PUBLIC_BASE }}
+          R2_ACCESS_KEY_ID: ${{ env.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ env.R2_SECRET_ACCESS_KEY }}
+          VERSION_NAME: ${{ env.VERSION_NAME }}
+        run: |
+          set -e
+          # Configure AWS credentials for R2
+          export AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
+          export AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
+          export AWS_DEFAULT_REGION="us-east-1"
+          APK_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$APK_PATH" || { echo "Debug APK not found at $APK_PATH" >&2; exit 1; }
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          STAMP=$(date -u +%Y%m%d%H%M)
+          RUN="$GITHUB_RUN_NUMBER"
+          VER="${VERSION_NAME:-0.0.0}"
+          NAME="mood-flow-${VER}-sinternal-${STAMP}-r${RUN}-${SHORT_SHA}.apk"
+          mkdir -p dist/internal
+          cp "$APK_PATH" "dist/internal/$NAME"
+          ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          # Upload debug APK to internal channel; do NOT update updates.json
+          aws s3 cp "dist/internal/$NAME" "s3://${R2_BUCKET}/internal/$NAME" --endpoint-url "$ENDPOINT" --no-progress
+          echo "Uploaded Debug APK to R2 internal channel (sinternal)"
+
       # Optional: Use unified script (Windows runner required for device install/smoke test)
       # - name: Build via unified script (optional)
       #   if: ${{ false }}
@@ -282,13 +334,37 @@ jobs:
         shell: bash
         run: |
           set -e
-          if [ -f dist/meta/release-notes.md ]; then
-            node scripts/summarize-release-notes.cjs dist/meta/release-notes.md > .notes.txt || true
-            NOTES_SUMMARY=$(cat .notes.txt | tr '\n' ' ')
+          # Prefer explicit input path; fallback to dist/meta/release-notes.md
+          INPUT_PATH="${{ inputs.release_notes_path }}"
+          if [ -z "$INPUT_PATH" ]; then INPUT_PATH="dist/meta/release-notes.md"; fi
+          if [ -f "$INPUT_PATH" ]; then
+            node scripts/summarize-release-notes.cjs "$INPUT_PATH" > .notes.txt || true
+            NOTES_SUMMARY=$(sed -e ':a;N;$!ba;s/\n/ /g' .notes.txt)
+            if [ -z "$NOTES_SUMMARY" ]; then
+              NOTES_SUMMARY="Release ${VERSION_NAME} generated by CI. See GitHub Release for details."
+            fi
             echo "NOTES_SUMMARY=$NOTES_SUMMARY" >> "$GITHUB_ENV"
             echo "Notes summary: $NOTES_SUMMARY"
           else
-            echo "dist/meta/release-notes.md missing; skip notes summary"
+            NOTES_SUMMARY="Release ${VERSION_NAME} generated by CI. See GitHub Release for details."
+            echo "NOTES_SUMMARY=$NOTES_SUMMARY" >> "$GITHUB_ENV"
+            echo "Notes summary (default): $NOTES_SUMMARY"
+          fi
+
+      - name: Append update policy to release notes (mandatory/notes)
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        shell: bash
+        run: |
+          set -e
+          BODY="dist/meta/release-notes.md"
+          test -f "$BODY" || { echo "Release notes body missing at $BODY" >&2; exit 1; }
+          echo >> "$BODY"
+          echo "## Update Policy" >> "$BODY"
+          echo "- Mandatory: ${MANDATORY_STR:-false}" >> "$BODY"
+          if [ -n "$NOTES_SUMMARY" ]; then
+            echo "- Notes: ${NOTES_SUMMARY}" >> "$BODY"
+          else
+            echo "- Notes: Release ${VERSION_NAME} generated by CI. See GitHub Release for details." >> "$BODY"
           fi
 
       - name: Upload Release APK to Cloudflare R2 (store label)
@@ -335,8 +411,20 @@ jobs:
           CMD=(node scripts/update-updates-json.cjs --apk-url "$R2_URL")
           if [ -n "$VERSION_NAME" ]; then CMD+=(--version "$VERSION_NAME"); fi
           if [ -n "$NOTES_SUMMARY" ]; then CMD+=(--notes "$NOTES_SUMMARY"); fi
+          if [ -n "$MANDATORY_STR" ]; then CMD+=(--mandatory "$MANDATORY_STR"); fi
           echo "Running: ${CMD[*]}"
           "${CMD[@]}"
+
+      - name: Validate updates.json structure (jq)
+        if: ${{ env.R2_URL != '' }}
+        shell: bash
+        run: |
+          set -e
+          echo "Validating public/updates.json"
+          sudo apt-get update -y >/dev/null 2>&1 || true
+          sudo apt-get install -y jq >/dev/null 2>&1 || true
+          jq -e 'type=="object" and has("latestVersion") and (.latestVersion|type=="string" and test("^[0-9]+\\.[0-9]+\\.[0-9]+$")) and has("androidApkUrl") and (.androidApkUrl|type=="string" and length>0) and has("publishedAt") and (.publishedAt|type=="string") and has("mandatory") and (.mandatory|type=="boolean")' public/updates.json >/dev/null
+          echo "updates.json is valid and contains required fields"
 
       - name: Upload updates.json to Cloudflare R2
         if: ${{ env.R2_ACCOUNT_ID != '' && env.R2_ACCESS_KEY_ID != '' && env.R2_SECRET_ACCESS_KEY != '' && env.R2_BUCKET != '' }}

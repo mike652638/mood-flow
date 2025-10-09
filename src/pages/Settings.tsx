@@ -28,7 +28,13 @@ import { rescheduleDailyReminder, ReminderOptions, requestReminderPermission } f
 import { Capacitor } from '@capacitor/core';
 import { supportsImmersiveStatusBar } from '../utils/capacitor';
 import { useUIStore } from '../store';
-import { checkForUpdate, UpdateCheckResult, getAutoCheckEnabled, setAutoCheckEnabled, openUpdateLink } from '../utils/update';
+import {
+  checkForUpdate,
+  UpdateCheckResult,
+  getAutoCheckEnabled,
+  setAutoCheckEnabled,
+  openUpdateLink
+} from '../utils/update';
 
 interface UserProfile {
   name: string;
@@ -70,7 +76,7 @@ interface SettingsProps {
 const Settings = ({ immersiveMode = false, onImmersiveModeChange, onThemeChange }: SettingsProps) => {
   const { immersiveMode: contextImmersiveMode } = useImmersiveMode();
   const actualImmersiveMode = immersiveMode || contextImmersiveMode;
-  const [activeTab, setActiveTab] = useState<'account' | 'app' | 'security'>('account');
+  const [activeTab, setActiveTab] = useState<'account' | 'app'>('account');
   const { toggleTheme, isDark, setTheme } = useTheme();
   const {
     autoThemeEnabled: storeAutoEnabled,
@@ -93,6 +99,32 @@ const Settings = ({ immersiveMode = false, onImmersiveModeChange, onThemeChange 
   const appVersion: string =
     (typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : (import.meta.env.VITE_APP_VERSION as string)) ||
     '1.0.0';
+
+  // 运行时版本（原生端优先使用 App.getInfo），以避免打包注入与安装版本不一致
+  const [runtimeVersion, setRuntimeVersion] = useState<string>(appVersion);
+  const [runtimeBuild, setRuntimeBuild] = useState<string>('');
+  useEffect(() => {
+    let cancelled = false;
+    const loadVersion = async () => {
+      try {
+        if (Capacitor.isNativePlatform()) {
+          const mod = await import('@capacitor/app');
+          const info = await mod.App.getInfo();
+          if (!cancelled && info?.version) setRuntimeVersion(info.version);
+          if (!cancelled && (info as any)?.build) setRuntimeBuild(String((info as any).build));
+        } else {
+          const injected = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : (import.meta.env.VITE_APP_VERSION as string);
+          if (!cancelled) setRuntimeVersion((injected || '1.0.0').trim());
+        }
+      } catch (err) {
+        console.warn('Load runtime version failed:', err);
+      }
+    };
+    loadVersion();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [userProfile, setUserProfile] = useState<UserProfile>({
     name: '心流日记爱好者',
@@ -221,7 +253,7 @@ const Settings = ({ immersiveMode = false, onImmersiveModeChange, onThemeChange 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleProfileUpdate = () => {
-    toast.success('个人信息已更新');
+    toast.success('个人资料已更新');
   };
 
   const handleSettingsUpdate = async <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
@@ -438,8 +470,7 @@ const Settings = ({ immersiveMode = false, onImmersiveModeChange, onThemeChange 
 
   const tabs = [
     { id: 'account', label: '账户设置', icon: User },
-    { id: 'app', label: '应用设置', icon: SettingsIcon },
-    { id: 'security', label: '数据安全', icon: Shield }
+    { id: 'app', label: '应用设置', icon: SettingsIcon }
   ];
 
   return (
@@ -448,22 +479,22 @@ const Settings = ({ immersiveMode = false, onImmersiveModeChange, onThemeChange 
       <Container className='pb-0'>
         <div className='page-sections'>
           {/* 标签页导航 */}
-          <Card variant='default' padding='sm' className='overflow-hidden'>
+          <Card variant='default' padding='sm' className='overflow-hidden p-2 sm:p-3'>
             <div className='flex space-x-2 sm:space-x-3 lg:space-x-4 overflow-x-auto scrollbar-hide p-1'>
               {tabs.map(tab => {
                 const Icon = tab.icon;
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id as 'account' | 'app' | 'security')}
+                    onClick={() => setActiveTab(tab.id as 'account' | 'app')}
                     aria-label={`切换到${tab.label}标签页`}
-                    className={`flex-1 flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3 sm:py-3.5 rounded-lg sm:rounded-xl text-xs sm:text-sm lg:text-base transition-all duration-200 min-w-0 font-medium ${
+                    className={`flex-1 flex flex-row items-center justify-center gap-2 px-3 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm lg:text-base transition-all duration-200 min-w-0 font-semibold ${
                       activeTab === tab.id
-                        ? 'bg-purple-500 text-white shadow-md transform scale-[1.02]'
-                        : 'bg-gray-100 dark:bg-theme-gray-700 text-gray-600 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-purple-900/30 hover:scale-[1.01]'
+                        ? 'bg-purple-500 text-white shadow-lg transform scale-[1.02]'
+                        : 'bg-gray-100 dark:bg-theme-gray-700 text-gray-600 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-purple-900/30 hover:shadow-md hover:scale-[1.01]'
                     }`}>
-                    <Icon className='w-5 h-5 flex-shrink-0' />
-                    <span className='text-xs sm:text-sm lg:text-base truncate whitespace-nowrap'>{tab.label}</span>
+                    <Icon className='w-4 h-4 flex-shrink-0' />
+                    <span className='text-sm sm:text-base lg:text-lg xl:text-xl font-bold truncate whitespace-nowrap'>{tab.label}</span>
                   </button>
                 );
               })}
@@ -480,16 +511,23 @@ const Settings = ({ immersiveMode = false, onImmersiveModeChange, onThemeChange 
                     账户设置
                   </h2>
                   <p className='text-sm sm:text-base lg:text-lg xl:text-xl text-gray-500 dark:text-gray-400'>
-                    管理您的个人信息和账户
+                    管理您的个人资料和数据
                   </p>
                 </div>
               </div>
 
-              {/* 个人资料 */}
-              <div className='mb-6 sm:mb-8 lg:mb-10'>
-                <h3 className='text-base sm:text-lg lg:text-xl font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4 lg:mb-5'>
-                  个人资料
-                </h3>
+              {/* 个人资料（改为 Card 包裹，采用图标行标题样式） */}
+              <Card
+                variant='default'
+                padding='md'
+                className='p-4 sm:p-5 lg:p-6 hover:shadow-lg transition-all duration-200 mb-4 sm:mb-5 lg:mb-6'>
+                <div className='flex items-center space-x-3 sm:space-x-4 mb-4'>
+                  <User className='w-6 h-6 sm:w-7 sm:h-7 text-purple-600 dark:text-purple-400' />
+                  <div>
+                    <h4 className='font-semibold text-base sm:text-lg text-gray-800 dark:text-gray-200'>个人资料</h4>
+                    <p className='text-sm sm:text-base text-gray-600 dark:text-gray-400'>管理昵称与邮箱</p>
+                  </div>
+                </div>
                 <div className='grid md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-3 sm:gap-4 lg:gap-6 xl:gap-8'>
                   <div>
                     <label className='block text-sm lg:text-base font-medium text-warm-gray-700 dark:text-gray-300 mb-2 lg:mb-3'>
@@ -522,19 +560,81 @@ const Settings = ({ immersiveMode = false, onImmersiveModeChange, onThemeChange 
                   className='btn-primary w-full py-3 lg:py-4 xl:py-5 mt-4 sm:mt-5 lg:mt-6 shadow-md hover:shadow-lg lg:hover:shadow-xl transition-all duration-200 text-base sm:text-lg lg:text-xl xl:text-2xl font-semibold'>
                   保存更改
                 </button>
+              </Card>
+
+              {/* 隐私安全（移除区块标题，统一并列栅格与间距） */}
+              <div className='mb-4 sm:mb-5 lg:mb-6'>
+                <div className='grid md:grid-cols-2 gap-4 sm:gap-5 lg:gap-6'>
+                  {/* 数据加密 */}
+                  <Card
+                    variant='default'
+                    padding='md'
+                    className='p-4 sm:p-5 lg:p-6 hover:shadow-lg transition-all duration-200'>
+                    <div className='flex items-center justify-between'>
+                      <div className='flex items-center space-x-3 sm:space-x-4 lg:space-x-6'>
+                        <Lock className='w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 text-green-600 dark:text-green-400' />
+                        <div>
+                          <h4 className='font-semibold text-base sm:text-lg lg:text-xl xl:text-2xl text-gray-800 dark:text-gray-200'>
+                            数据加密
+                          </h4>
+                          <p className='text-sm sm:text-base lg:text-lg text-gray-600 dark:text-gray-400'>
+                            保护您的数据安全
+                          </p>
+                        </div>
+                      </div>
+                      <label className='relative inline-flex items-center cursor-pointer' aria-label='数据加密'>
+                        <input
+                          type='checkbox'
+                          checked={settings.dataEncryption}
+                          onChange={e => handleSettingsUpdate('dataEncryption', e.target.checked)}
+                          className='sr-only peer'
+                          aria-describedby='data-encryption-description'
+                        />
+                        <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-theme-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-theme-gray-600 peer-checked:bg-purple-600"></div>
+                      </label>
+                    </div>
+                  </Card>
+
+                  {/* 隐私模式 */}
+                  <Card
+                    variant='default'
+                    padding='md'
+                    className='p-4 sm:p-5 lg:p-6 hover:shadow-lg transition-all duration-200'>
+                    <div className='flex items-center justify-between'>
+                      <div className='flex items-center space-x-3 sm:space-x-4 lg:space-x-6'>
+                        <EyeOff className='w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 text-blue-600 dark:text-blue-400' />
+                        <div>
+                          <h4 className='font-semibold text-base sm:text-lg lg:text-xl xl:text-2xl text-gray-800 dark:text-gray-200'>
+                            隐私模式
+                          </h4>
+                          <p className='text-sm sm:text-base lg:text-lg text-gray-600 dark:text-gray-400'>
+                            隐藏敏感信息
+                          </p>
+                        </div>
+                      </div>
+                      <label className='relative inline-flex items-center cursor-pointer' aria-label='隐私模式'>
+                        <input
+                          type='checkbox'
+                          checked={settings.privacyMode}
+                          onChange={e => handleSettingsUpdate('privacyMode', e.target.checked)}
+                          className='sr-only peer'
+                          aria-describedby='privacy-mode-description'
+                        />
+                        <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
+                      </label>
+                    </div>
+                  </Card>
+                </div>
               </div>
 
-              {/* 数据管理 */}
-              <div className='mb-6 sm:mb-8 lg:mb-10'>
-                <h3 className='text-base sm:text-lg lg:text-xl font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4 lg:mb-5'>
-                  数据管理
-                </h3>
-                <div className='space-y-3 sm:space-y-4'>
+              {/* 数据管理（移除区块标题，统一并列栅格与间距） */}
+              <div className='mb-4 sm:mb-5 lg:mb-6'>
+                <div className='grid md:grid-cols-2 gap-4 sm:gap-5 lg:gap-6'>
                   {/* 数据导出 */}
                   <Card
                     variant='default'
                     padding='md'
-                    className='p-3 sm:p-4 lg:p-6 xl:p-8 2xl:p-10 hover:shadow-lg transition-all duration-200'>
+                    className='p-4 sm:p-5 lg:p-6 hover:shadow-lg transition-all duration-200'>
                     <div className='flex items-center justify-between'>
                       <div className='flex items-center space-x-3 sm:space-x-4 lg:space-x-6'>
                         <Download className='w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 text-green-600 dark:text-green-400' />
@@ -560,7 +660,7 @@ const Settings = ({ immersiveMode = false, onImmersiveModeChange, onThemeChange 
                   <Card
                     variant='default'
                     padding='md'
-                    className='p-3 sm:p-4 lg:p-6 xl:p-8 2xl:p-10 hover:shadow-lg transition-all duration-200 border-red-200 dark:border-red-800'>
+                    className='p-4 sm:p-5 lg:p-6 hover:shadow-lg transition-all duration-200 border-red-200 dark:border-red-800'>
                     <div className='flex items-center justify-between'>
                       <div className='flex items-center space-x-3 sm:space-x-4 lg:space-x-6'>
                         <Trash2 className='w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 text-red-600 dark:text-red-400' />
@@ -866,154 +966,78 @@ const Settings = ({ immersiveMode = false, onImmersiveModeChange, onThemeChange 
                     {/* 结束禁用样式容器 */}
                   </div>
                 </Card>
-              </div>
-            </Card>
-          )}
 
-          {/* 数据安全 */}
-          {activeTab === 'security' && (
-            <Card variant='default' padding='md' className='p-4 sm:p-5 lg:p-8 xl:p-10 2xl:p-12'>
-              <div className='flex items-center space-x-3 sm:space-x-4 lg:space-x-6 mb-4 sm:mb-5 lg:mb-6 xl:mb-8'>
-                <Shield className='w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-purple-500' />
-                <div>
-                  <h2 className='text-lg sm:text-xl lg:text-2xl xl:text-3xl 2xl:text-4xl font-semibold text-gray-900 dark:text-white'>
-                    数据安全
-                  </h2>
-                  <p className='text-sm sm:text-base lg:text-lg xl:text-xl text-gray-500 dark:text-gray-400'>
-                    保护您的数据和隐私
+                {/* 应用更新与升级 */}
+                <Card
+                  variant='default'
+                  padding='md'
+                  className='p-3 sm:p-4 lg:p-6 xl:p-8 2xl:p-10 mb-6 sm:mb-8 lg:mb-10'>
+                  <div className='flex items-start justify-between'>
+                    <div className='flex items-center space-x-3 sm:space-x-4 lg:space-x-6'>
+                      <Download className='w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-purple-600 dark:text-purple-400' />
+                      <div>
+                        <h4 className='font-semibold text-base sm:text-lg lg:text-xl text-gray-800 dark:text-gray-200'>
+                          应用更新与升级
+                        </h4>
+                        <p className='text-sm sm:text-base lg:text-lg text-gray-600 dark:text-gray-400'>
+                          当前版本 V{runtimeVersion}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleCheckUpdate}
+                      disabled={checkingUpdate}
+                      className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-sm sm:text-base font-medium transition-all duration-200 border shadow-md hover:shadow-lg flex items-center gap-2 ${
+                        checkingUpdate
+                          ? 'bg-gray-200 dark:bg-theme-gray-700 text-gray-600 dark:text-gray-300 cursor-wait'
+                          : 'bg-purple-600 text-white hover:bg-purple-700'
+                      }`}
+                      aria-label='检查更新'>
+                      {checkingUpdate ? (
+                        <span className='inline-flex items-center gap-2'>
+                          <svg className='animate-spin h-4 w-4' viewBox='0 0 24 24'>
+                            <circle
+                              className='opacity-25'
+                              cx='12'
+                              cy='12'
+                              r='10'
+                              stroke='currentColor'
+                              strokeWidth='4'></circle>
+                            <path
+                              className='opacity-75'
+                              fill='currentColor'
+                              d='M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z'></path>
+                          </svg>
+                          正在检查...
+                        </span>
+                      ) : (
+                        '检查更新'
+                      )}
+                    </button>
+                  </div>
+                  <p className='mt-3 text-sm sm:text-base text-gray-600 dark:text-gray-400'>
+                    支持原生端 APK 升级与 Web 端提示，若检测到新版本，将显示版本说明与下载入口。
                   </p>
-                </div>
-              </div>
-
-              {/* 隐私安全 */}
-              <div className='mb-6 sm:mb-8 lg:mb-10'>
-                <h3 className='text-base sm:text-lg lg:text-xl font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4 lg:mb-5'>
-                  隐私安全
-                </h3>
-                <div className='space-y-4 sm:space-y-5 lg:space-y-6'>
-                  {/* 数据加密 */}
-                  <Card
-                    variant='default'
-                    padding='md'
-                    className='p-3 sm:p-4 lg:p-6 xl:p-8 2xl:p-10 hover:shadow-lg transition-all duration-200'>
-                    <div className='flex items-center justify-between'>
-                      <div className='flex items-center space-x-3 sm:space-x-4 lg:space-x-6'>
-                        <Lock className='w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 text-green-600 dark:text-green-400' />
-                        <div>
-                          <h4 className='font-semibold text-base sm:text-lg lg:text-xl xl:text-2xl text-gray-800 dark:text-gray-200'>
-                            数据加密
-                          </h4>
-                          <p className='text-sm sm:text-base lg:text-lg text-gray-600 dark:text-gray-400'>
-                            保护您的数据安全
-                          </p>
-                        </div>
-                      </div>
-                      <label className='relative inline-flex items-center cursor-pointer' aria-label='数据加密'>
-                        <input
-                          type='checkbox'
-                          checked={settings.dataEncryption}
-                          onChange={e => handleSettingsUpdate('dataEncryption', e.target.checked)}
-                          className='sr-only peer'
-                          aria-describedby='data-encryption-description'
-                        />
-                        <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-theme-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-theme-gray-600 peer-checked:bg-purple-600"></div>
-                      </label>
-                    </div>
-                  </Card>
-
-                  {/* 隐私模式 */}
-                  <Card
-                    variant='default'
-                    padding='md'
-                    className='p-3 sm:p-4 lg:p-6 xl:p-8 2xl:p-10 hover:shadow-lg transition-all duration-200'>
-                    <div className='flex items-center justify-between'>
-                      <div className='flex items-center space-x-3 sm:space-x-4 lg:space-x-6'>
-                        <EyeOff className='w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 text-blue-600 dark:text-blue-400' />
-                        <div>
-                          <h4 className='font-semibold text-base sm:text-lg lg:text-xl xl:text-2xl text-gray-800 dark:text-gray-200'>
-                            隐私模式
-                          </h4>
-                          <p className='text-sm sm:text-base lg:text-lg text-gray-600 dark:text-gray-400'>
-                            隐藏敏感信息
-                          </p>
-                        </div>
-                      </div>
-                      <label className='relative inline-flex items-center cursor-pointer' aria-label='隐私模式'>
-                        <input
-                          type='checkbox'
-                          checked={settings.privacyMode}
-                          onChange={e => handleSettingsUpdate('privacyMode', e.target.checked)}
-                          className='sr-only peer'
-                          aria-describedby='privacy-mode-description'
-                        />
-                        <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
-                      </label>
-                    </div>
-                  </Card>
-                </div>
-              </div>
-
-              {/* 应用更新与升级 */}
-              <Card variant='default' padding='md' className='p-3 sm:p-4 lg:p-6 xl:p-8 2xl:p-10 mb-6 sm:mb-8 lg:mb-10'>
-                <div className='flex items-start justify-between'>
-                  <div className='flex items-center space-x-3 sm:space-x-4 lg:space-x-6'>
-                    <Download className='w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-purple-600 dark:text-purple-400' />
+                  <div className='mt-3 sm:mt-4 flex items-center justify-between'>
                     <div>
-                      <h4 className='font-semibold text-base sm:text-lg lg:text-xl text-gray-800 dark:text-gray-200'>
-                        应用更新与升级
-                      </h4>
-                      <p className='text-sm sm:text-base lg:text-lg text-gray-600 dark:text-gray-400'>
-                        当前版本 V{appVersion}
-                      </p>
+                      <h5 className='font-medium text-sm sm:text-base text-gray-800 dark:text-gray-200'>
+                        自动检查更新
+                      </h5>
+                      <p className='text-xs sm:text-sm text-gray-600 dark:text-gray-400'>开机或回到前台时自动检测</p>
                     </div>
+                    <label className='relative inline-flex items-center cursor-pointer' aria-label='自动检查更新'>
+                      <input
+                        type='checkbox'
+                        checked={!!settings.autoCheckUpdate}
+                        onChange={e => handleAutoCheckToggle(e.target.checked)}
+                        className='sr-only peer'
+                      />
+                      <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
+                    </label>
                   </div>
-                  <button
-                    onClick={handleCheckUpdate}
-                    disabled={checkingUpdate}
-                    className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-sm sm:text-base font-medium transition-all duration-200 border shadow-md hover:shadow-lg flex items-center gap-2 ${
-                      checkingUpdate
-                        ? 'bg-gray-200 dark:bg-theme-gray-700 text-gray-600 dark:text-gray-300 cursor-wait'
-                        : 'bg-purple-600 text-white hover:bg-purple-700'
-                    }`}
-                    aria-label='检查更新'>
-                    {checkingUpdate ? (
-                      <span className='inline-flex items-center gap-2'>
-                        <svg className='animate-spin h-4 w-4' viewBox='0 0 24 24'>
-                          <circle className='opacity-25' cx='12' cy='12' r='10' stroke='currentColor' strokeWidth='4'></circle>
-                          <path className='opacity-75' fill='currentColor' d='M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z'></path>
-                        </svg>
-                        正在检查...
-                      </span>
-                    ) : (
-                      '检查更新'
-                    )}
-                  </button>
-                </div>
-                <p className='mt-3 text-sm sm:text-base text-gray-600 dark:text-gray-400'>
-                  支持原生端 APK 升级与 Web 端提示，若检测到新版本，将显示版本说明与下载入口。
-                </p>
-                <div className='mt-3 sm:mt-4 flex items-center justify-between'>
-                  <div>
-                    <h5 className='font-medium text-sm sm:text-base text-gray-800 dark:text-gray-200'>自动检查更新</h5>
-                    <p className='text-xs sm:text-sm text-gray-600 dark:text-gray-400'>开机或回到前台时自动检测</p>
-                  </div>
-                  <label className='relative inline-flex items-center cursor-pointer' aria-label='自动检查更新'>
-                    <input
-                      type='checkbox'
-                      checked={!!settings.autoCheckUpdate}
-                      onChange={e => handleAutoCheckToggle(e.target.checked)}
-                      className='sr-only peer'
-                    />
-                    <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
-                  </label>
-                </div>
-              </Card>
+                </Card>
 
-              {/* 关于应用 */}
-              <div className='mb-6 sm:mb-8 lg:mb-10'>
-                <h3 className='text-base sm:text-lg lg:text-xl font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4 lg:mb-5'>
-                  关于应用
-                </h3>
+                {/* 关于应用 */}
                 <Card variant='default' padding='md' className='p-3 sm:p-4 lg:p-6 xl:p-8 2xl:p-10'>
                   <div className='flex items-center space-x-3 sm:space-x-4 lg:space-x-6 mb-4 sm:mb-5 lg:mb-6'>
                     <Heart className='w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 text-pink-500' />
@@ -1022,34 +1046,22 @@ const Settings = ({ immersiveMode = false, onImmersiveModeChange, onThemeChange 
                         关于应用
                       </h4>
                       <p className='text-sm sm:text-base lg:text-lg text-gray-600 dark:text-gray-400'>
-                        了解更多关于心流日记的信息
+                        了解更多应用信息
                       </p>
                     </div>
                   </div>
 
                   <div className='space-y-3 sm:space-y-4'>
-                    <div>
-                      <h5 className='font-medium text-sm sm:text-base lg:text-lg text-gray-700 dark:text-gray-300 mb-1'>
-                        版本信息
-                      </h5>
-                      <p className='text-sm sm:text-base lg:text-lg text-gray-600 dark:text-gray-400'>
-                        心流日记 V{appVersion}
-                      </p>
-                    </div>
+
+                    
 
                     <div>
-                      <h5 className='font-medium text-sm sm:text-base lg:text-lg text-gray-700 dark:text-gray-300 mb-1'>
-                        应用介绍
-                      </h5>
                       <p className='text-sm sm:text-base lg:text-lg text-gray-600 dark:text-gray-400 leading-relaxed'>
                         心流日记是一款专注于心理健康的应用，帮助用户记录和管理情绪，提供个性化的情绪分析和建议。
                       </p>
                     </div>
 
                     <div>
-                      <h5 className='font-medium text-sm sm:text-base lg:text-lg text-gray-700 dark:text-gray-300 mb-2'>
-                        政策协议
-                      </h5>
                       <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4'>
                         <Link
                           to='/terms'

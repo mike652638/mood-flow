@@ -227,6 +227,19 @@ function Get-ApplicationId {
   return $null
 }
 
+function Get-AndroidVersionInfo {
+  try {
+    $gradle = Get-Content 'android/app/build.gradle' -Raw
+    $vn = [regex]::Match($gradle, 'versionName\s+"([^"]+)"')
+    $vc = [regex]::Match($gradle, 'versionCode\s+(\d+)')
+    $name = if ($vn.Success) { $vn.Groups[1].Value } else { '' }
+    $code = if ($vc.Success) { $vc.Groups[1].Value } else { '' }
+    return @{ versionName = $name; versionCode = $code }
+  } catch {
+    return @{ versionName = ''; versionCode = '' }
+  }
+}
+
 function Install-APK {
   param([string]$ApkPath, [string]$DeviceId, [bool]$AllowTestInstall = $true)
   if (-not (Test-Path $ApkPath)) { throw "APK 不存在: $ApkPath" }
@@ -301,6 +314,11 @@ try {
   # 2) 构建 Web 资源
   Write-Info 'npm run build'
   Write-Info '=== 步骤 2/4：构建 Web 资源 ==='
+  $ver = Get-AndroidVersionInfo
+  if ($ver['versionName']) {
+    Write-Info "注入环境变量 VITE_APP_VERSION=$($ver['versionName'])"
+    $env:VITE_APP_VERSION = $ver['versionName']
+  }
   & npm.cmd run build
   if ($LASTEXITCODE -ne 0) { throw 'Web 构建失败' }
   Write-Success 'Web 构建完成'

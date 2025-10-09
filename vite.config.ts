@@ -1,6 +1,6 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import tsconfigPaths from "vite-tsconfig-paths";
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import tsconfigPaths from 'vite-tsconfig-paths';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
@@ -28,7 +28,7 @@ function readAppVersion(): string {
 // https://vite.dev/config/
 export default defineConfig({
   define: {
-    __APP_VERSION__: JSON.stringify(readAppVersion()),
+    __APP_VERSION__: JSON.stringify(readAppVersion())
   },
   build: {
     sourcemap: 'hidden',
@@ -45,15 +45,15 @@ export default defineConfig({
           'chart-vendor': ['recharts', 'date-fns', '@visx/responsive', '@visx/scale', '@visx/text', '@visx/wordcloud'],
           // 将 Capacitor 相关库分离
           'capacitor-vendor': [
-            '@capacitor/core', 
-            '@capacitor/camera', 
-            '@capacitor/device', 
-            '@capacitor/filesystem', 
-            '@capacitor/keyboard', 
-            '@capacitor/network', 
-            '@capacitor/share', 
-            '@capacitor/splash-screen', 
-            '@capacitor/status-bar', 
+            '@capacitor/core',
+            '@capacitor/camera',
+            '@capacitor/device',
+            '@capacitor/filesystem',
+            '@capacitor/keyboard',
+            '@capacitor/network',
+            '@capacitor/share',
+            '@capacitor/splash-screen',
+            '@capacitor/status-bar',
             '@capacitor/toast',
             '@langx/capacitor-voice-recorder',
             '@ionic/pwa-elements'
@@ -66,5 +66,5 @@ export default defineConfig({
     // 移除开发态的 react-dev-locator 以避免浏览器尝试请求 TSX 源文件导致的 net::ERR_ABORTED 报错
     react(),
     tsconfigPaths()
-  ],
-})
+  ]
+});

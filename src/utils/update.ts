@@ -15,7 +15,16 @@ export interface UpdateCheckResult {
 
 const AUTO_CHECK_KEY = 'app.update.autoCheck';
 
-function getCurrentVersion(): string {
+async function getCurrentVersion(): Promise<string> {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      const mod = await import('@capacitor/app');
+      const info = await mod.App.getInfo();
+      if (info?.version) return info.version.trim();
+    }
+  } catch (err) {
+    console.warn('Native getCurrentVersion failed:', err);
+  }
   const injected = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : undefined;
   const envObj = (import.meta as unknown as { env?: { VITE_APP_VERSION?: string } }).env;
   const env = envObj?.VITE_APP_VERSION as string | undefined;
@@ -37,7 +46,7 @@ export function compareVersions(a: string, b: string): number {
 }
 
 export async function checkForUpdate(customUrl?: string): Promise<UpdateCheckResult> {
-  const current = getCurrentVersion();
+  const current = await getCurrentVersion();
   const envObj = (import.meta as unknown as { env?: { VITE_APP_UPDATE_URL?: string; VITE_APP_UPDATES_BASE?: string } }).env;
   const envUrl = envObj?.VITE_APP_UPDATE_URL as string | undefined;
   const baseUrl = envObj?.VITE_APP_UPDATES_BASE as string | undefined;
