@@ -186,7 +186,9 @@ function Find-Run-ByGhCommit {
         [string]$CommitSha
     )
     Write-Host "[DEBUG] Find-Run-ByGhCommit: Searching for commit=$CommitSha"
-    $run = gh run list --commit "$CommitSha" --json databaseId,headBranch,headSha,status,conclusion,workflowName,displayTitle,url --jq '.[0]' | ConvertFrom-Json -ErrorAction SilentlyContinue
+    $runJson = gh run list --commit "$CommitSha" --json databaseId,headBranch,headSha,status,conclusion,workflowName,displayTitle,url | ConvertFrom-Json -ErrorAction SilentlyContinue
+    $run = $runJson | Select-Object -First 1
+
     if ($run) {
         Write-Host "[DEBUG] Find-Run-ByGhCommit: Found run $($run.databaseId) via gh commit list"
         # The output from `gh run list` is good, but let's use the REST API to get the full object for consistency
