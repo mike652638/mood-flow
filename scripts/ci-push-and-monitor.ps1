@@ -99,7 +99,7 @@ function Get-Run-ByHeadSha {
 }
 
 function Get-RunJobs {
-  param([string]$Owner, [string]$Repo, [int]$RunId, [string]$Token)
+  param([string]$Owner, [string]$Repo, [long]$RunId, [string]$Token)
   $headers = @{ 'Accept' = 'application/vnd.github+json' }
   if ($Token) { $headers['Authorization'] = ('Bearer ' + $Token); $headers['X-GitHub-Api-Version'] = '2022-11-28' }
   $url = ('https://api.github.com/repos/' + $Owner + '/' + $Repo + '/actions/runs/' + $RunId + '/jobs?per_page=50')
@@ -131,7 +131,7 @@ function Find-Run-ByWorkflow {
 
 # Refresh run by id using REST to get latest status
 function Get-RunById {
-  param([string]$Owner, [string]$Repo, [int]$RunId, [string]$Token)
+  param([string]$Owner, [string]$Repo, [long]$RunId, [string]$Token)
   $headers = @{ 'Accept' = 'application/vnd.github+json' }
   if ($Token) { $headers['Authorization'] = ('Bearer ' + $Token); $headers['X-GitHub-Api-Version'] = '2022-11-28' }
   $url = ('https://api.github.com/repos/' + $Owner + '/' + $Repo + '/actions/runs/' + $RunId)
