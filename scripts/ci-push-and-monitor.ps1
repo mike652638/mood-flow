@@ -186,7 +186,7 @@ function Find-Run-ByGhCommit {
         [string]$CommitSha
     )
     Write-Host "[DEBUG] Find-Run-ByGhCommit: Searching for commit=$CommitSha"
-    $runJson = gh run list --commit "$CommitSha" --json databaseId,headBranch,headSha,status,conclusion,workflowName,displayTitle,url | ConvertFrom-Json -ErrorAction SilentlyContinue
+    $runJson = gh run list --commit "$CommitSha" --json "databaseId,headBranch,headSha,status,conclusion,workflowName,displayTitle,url" | ConvertFrom-Json -ErrorAction SilentlyContinue
     $run = $runJson | Select-Object -First 1
 
     if ($run) {
@@ -277,7 +277,7 @@ try {
       break
     }
     # Fallback 3: filter by commit via gh run list
-    $runsGhCommit = Find-Run-ByGhCommit -Sha $sha
+    $runsGhCommit = Find-Run-ByGhCommit -CommitSha $sha
     if ($runsGhCommit -and $runsGhCommit.Count -gt 0) {
       $run = $runsGhCommit[0]
       Write-Info ("Found run via gh commit: run_id=" + $run.id + ", status=" + $run.status)
