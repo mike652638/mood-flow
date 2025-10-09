@@ -1,25 +1,25 @@
 ﻿{
     "ok":  true,
-    "tag":  "v1.2.1",
+    "tag":  "v1.2.2",
     "branch":  "main",
-    "head_sha":  "59a756eebf2b80655958d50c37ce7f01c4506c54",
-    "run_id":  18383644658,
-    "run_number":  70,
+    "head_sha":  "cc4ad742213fab1ea3bb8e9cd1917f7bab32be46",
+    "run_id":  18387281313,
+    "run_number":  71,
     "status":  "completed",
-    "conclusion":  "success",
-    "html_url":  "https://github.com/mike652638/mood-flow/actions/runs/18383644658",
+    "conclusion":  "failure",
+    "html_url":  "https://github.com/mike652638/mood-flow/actions/runs/18387281313",
     "workflow_name":  "Build Android APK",
     "workflow_path":  ".github/workflows/build-android.yml",
     "jobs":  [
                  {
                      "status":  "completed",
                      "name":  "build-android",
-                     "conclusion":  "success"
+                     "conclusion":  "failure"
                  },
                  {
                      "status":  "completed",
                      "name":  "publish-release",
-                     "conclusion":  "success"
+                     "conclusion":  "skipped"
                  }
              ]
 }

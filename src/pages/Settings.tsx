@@ -102,16 +102,16 @@ const Settings = ({ immersiveMode = false, onImmersiveModeChange, onThemeChange 
 
   // 运行时版本（原生端优先使用 App.getInfo），以避免打包注入与安装版本不一致
   const [runtimeVersion, setRuntimeVersion] = useState<string>(appVersion);
-  const [runtimeBuild, setRuntimeBuild] = useState<string>('');
+  const [_runtimeBuild, setRuntimeBuild] = useState<string>('');
   useEffect(() => {
     let cancelled = false;
     const loadVersion = async () => {
       try {
         if (Capacitor.isNativePlatform()) {
           const mod = await import('@capacitor/app');
-          const info = await mod.App.getInfo();
+          const info: { version?: string; build?: string | number } = await mod.App.getInfo();
           if (!cancelled && info?.version) setRuntimeVersion(info.version);
-          if (!cancelled && (info as any)?.build) setRuntimeBuild(String((info as any).build));
+          if (!cancelled && info?.build != null) setRuntimeBuild(String(info.build));
         } else {
           const injected = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : (import.meta.env.VITE_APP_VERSION as string);
           if (!cancelled) setRuntimeVersion((injected || '1.0.0').trim());
