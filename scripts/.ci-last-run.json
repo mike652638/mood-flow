@@ -1,16 +1,7 @@
 ﻿{
-    "ok":  true,
-    "tag":  "v1.1.99-ci9",
     "branch":  "main",
-    "head_sha":  "5915393205a5bec0d0d75470e888527f1cf5e1e5",
-    "run_id":  18379915627,
-    "run_number":  55,
-    "status":  "completed",
-    "conclusion":  "failure",
-    "html_url":  "https://github.com/mike652638/mood-flow/actions/runs/18379915627",
-    "workflow_name":  ".github/workflows/build-android.yml",
-    "workflow_path":  ".github/workflows/build-android.yml",
-    "jobs":  {
-
-             }
+    "ok":  false,
+    "actions_url":  "https://github.com/mike652638/mood-flow/actions?query=event%3Apush",
+    "reason":  "run_not_found",
+    "tag":  "v1.1.99-ci10"
 }

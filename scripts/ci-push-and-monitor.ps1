@@ -65,7 +65,7 @@ function Auto-Tag {
   $existing = & git tag --list ($base + '-ci*')
   $max = 0
   foreach ($t in $existing) {
-    $m2 = [regex]::Match($t, '^'+[regex]::Escape($base)+'-ci(\d+)$')
+    $m2 = [regex]::Match($t, '^' + [regex]::Escape($base) + '-ci(\d+)$')
     if ($m2.Success) { $n = [int]$m2.Groups[1].Value; if ($n -gt $max) { $max = $n } }
   }
   $next = $max + 1
@@ -80,7 +80,8 @@ function Get-GitHubToken {
       $tok = (& gh auth token 2>$null)
       if ($tok) { return $tok.Trim() }
     }
-  } catch {}
+  }
+  catch {}
   return $null
 }
 
@@ -92,21 +93,23 @@ function Get-Run-ByHeadSha {
   try {
     $resp = Invoke-RestMethod -Uri $url -Headers $headers -Method GET
     return $resp.workflow_runs
-  } catch {
+  }
+  catch {
     Write-Warn ("Failed to fetch workflow runs: " + $_.Exception.Message)
     return $null
   }
 }
 
 function Get-RunJobs {
-  param([string]$Owner, [string]$Repo, [long]$RunId, [string]$Token)
+  param([string]$Owner, [string]$Repo, [int]$RunId, [string]$Token)
   $headers = @{ 'Accept' = 'application/vnd.github+json' }
   if ($Token) { $headers['Authorization'] = ('Bearer ' + $Token); $headers['X-GitHub-Api-Version'] = '2022-11-28' }
   $url = ('https://api.github.com/repos/' + $Owner + '/' + $Repo + '/actions/runs/' + $RunId + '/jobs?per_page=50')
   try {
     $resp = Invoke-RestMethod -Uri $url -Headers $headers -Method GET
     return $resp.jobs
-  } catch {
+  }
+  catch {
     Write-Warn ("Failed to fetch jobs: " + $_.Exception.Message)
     return $null
   }
@@ -116,41 +119,44 @@ function Get-RunJobs {
 function Find-Run-ByWorkflow {
   param([string]$Owner, [string]$Repo, [string]$Sha)
   try {
-    $wfsJson = (& gh workflow list --json id,name 2>$null)
+    $wfsJson = (& gh workflow list --json id, name 2>$null)
     if (-not $wfsJson) { return $null }
     $wfs = $wfsJson | ConvertFrom-Json
     $wf = $wfs | Where-Object { $_.name -eq 'Build Android APK' } | Select-Object -First 1
     if (-not $wf) { return $null }
-    $runsJson = (& gh api ("repos/"+$Owner+"/"+$Repo+"/actions/workflows/"+$wf.id+"/runs?event=push&per_page=50") 2>$null)
+    $runsJson = (& gh api ("repos/" + $Owner + "/" + $Repo + "/actions/workflows/" + $wf.id + "/runs?event=push&per_page=50") 2>$null)
     if (-not $runsJson) { return $null }
     $obj = $runsJson | ConvertFrom-Json
     $runs = $obj.workflow_runs | Where-Object { $_.head_sha -eq $Sha }
     return $runs
-  } catch { return $null }
+  }
+  catch { return $null }
 }
 
 # Refresh run by id using REST to get latest status
 function Get-RunById {
-  param([string]$Owner, [string]$Repo, [long]$RunId, [string]$Token)
+  param([string]$Owner, [string]$Repo, [int]$RunId, [string]$Token)
   $headers = @{ 'Accept' = 'application/vnd.github+json' }
   if ($Token) { $headers['Authorization'] = ('Bearer ' + $Token); $headers['X-GitHub-Api-Version'] = '2022-11-28' }
   $url = ('https://api.github.com/repos/' + $Owner + '/' + $Repo + '/actions/runs/' + $RunId)
   try {
     return Invoke-RestMethod -Uri $url -Headers $headers -Method GET
-  } catch { return $null }
+  }
+  catch { return $null }
 }
 
 # Fallback: use gh CLI to list recent push runs and filter by head_sha
 function Find-Run-Fallback {
   param([string]$Owner, [string]$Repo, [string]$Sha)
   try {
-    $json = (& gh api ("repos/"+$Owner+"/"+$Repo+"/actions/runs?event=push&per_page=50") 2>$null)
+    $json = (& gh api ("repos/" + $Owner + "/" + $Repo + "/actions/runs?event=push&per_page=50") 2>$null)
     if ($json) {
       $obj = $json | ConvertFrom-Json
       $runs = $obj.workflow_runs | Where-Object { $_.head_sha -eq $Sha }
       return $runs
     }
-  } catch {}
+  }
+  catch {}
   return $null
 }
 
@@ -158,22 +164,23 @@ function Find-Run-Fallback {
 function Find-Run-ByGhCommit {
   param([string]$Sha)
   try {
-    $listJson = (& gh run list --commit $Sha --json databaseId,headSha,status,conclusion,workflowName,displayTitle,url 2>$null)
+    $listJson = (& gh run list --commit $Sha --json databaseId, headSha, status, conclusion, workflowName, displayTitle, url 2>$null)
     if (-not $listJson) { return $null }
     $arr = $listJson | ConvertFrom-Json
     # Normalize shape to match REST run object where possible
     $norm = $arr | Where-Object { $_.headSha -eq $Sha } | ForEach-Object {
       [pscustomobject]@{
-        id = $_.databaseId
-        status = $_.status
+        id         = $_.databaseId
+        status     = $_.status
         conclusion = $_.conclusion
-        name = $_.workflowName
-        html_url = $_.url
-        head_sha = $_.headSha
+        name       = $_.workflowName
+        html_url   = $_.url
+        head_sha   = $_.headSha
       }
     }
     return $norm
-  } catch { return $null }
+  }
+  catch { return $null }
 }
 
 function Save-SummaryJson {
@@ -183,7 +190,8 @@ function Save-SummaryJson {
     $json = $obj | ConvertTo-Json -Depth 6
     Set-Content -Path $outPath -Value $json -Encoding UTF8
     Write-Ok ("Saved run summary: " + $outPath)
-  } catch {
+  }
+  catch {
     Write-Warn ("Failed to save summary: " + $_.Exception.Message)
   }
 }
@@ -199,7 +207,8 @@ try {
     $msg = if ($CommitMessage) { $CommitMessage } else { 'chore(ci): trigger Android CI run' }
     & git commit -m "$msg"
     Write-Ok 'Commit done'
-  } else {
+  }
+  else {
     Write-Info 'No changes to commit, skipping'
   }
 
@@ -214,7 +223,8 @@ try {
   if ($exists) {
     Write-Warn ("Tag already exists; updating to current HEAD: " + $tagName)
     & git tag -f $tagName
-  } else {
+  }
+  else {
     $tagMsg = if ($CommitMessage) { $CommitMessage } else { "CI trigger $tagName" }
     & git tag -a $tagName -m $tagMsg
   }
@@ -239,25 +249,21 @@ try {
   while ((Get-Date) -lt $deadline) {
     $runs = Get-Run-ByHeadSha -Owner $owner -Repo $repo -Sha $sha -Token $token
     if ($runs -and $runs.Count -gt 0) {
-      # Prefer tag push runs: head_branch is null/empty for tag-triggered runs
-      $run = ($runs | Where-Object { -not $_.head_branch -or $_.head_branch -eq '' } | Select-Object -First 1)
-      if (-not $run) { $run = $runs[0] }
+      $run = $runs[0]
       Write-Info ("Found run: run_id=" + $run.id + ", status=" + $run.status)
       break
     }
     # Fallback with gh CLI (in case REST indexing or filter fails)
     $runsGh = Find-Run-Fallback -Owner $owner -Repo $repo -Sha $sha
     if ($runsGh -and $runsGh.Count -gt 0) {
-      $run = ($runsGh | Where-Object { -not $_.head_branch -or $_.head_branch -eq '' } | Select-Object -First 1)
-      if (-not $run) { $run = $runsGh[0] }
+      $run = $runsGh[0]
       Write-Info ("Found run via gh: run_id=" + $run.id + ", status=" + $run.status)
       break
     }
     # Fallback 3: filter by commit via gh run list
     $runsGhCommit = Find-Run-ByGhCommit -Sha $sha
     if ($runsGhCommit -and $runsGhCommit.Count -gt 0) {
-      $run = ($runsGhCommit | Where-Object { -not $_.head_branch -or $_.head_branch -eq '' } | Select-Object -First 1)
-      if (-not $run) { $run = $runsGhCommit[0] }
+      $run = $runsGhCommit[0]
       Write-Info ("Found run via gh commit: run_id=" + $run.id + ", status=" + $run.status)
       # Enrich run with REST details
       $restRun = Get-RunById -Owner $owner -Repo $repo -RunId $run.id -Token $token
@@ -294,18 +300,18 @@ try {
   if ($run -and $run.id) { $jobs = Get-RunJobs -Owner $owner -Repo $repo -RunId $run.id -Token $token }
 
   $summary = [ordered]@{
-    ok = $true
-    tag = $tagName
-    branch = $br
-    head_sha = $sha
-    run_id = $run.id
-    run_number = $run.run_number
-    status = $run.status
-    conclusion = $run.conclusion
-    html_url = $run.html_url
+    ok            = $true
+    tag           = $tagName
+    branch        = $br
+    head_sha      = $sha
+    run_id        = $run.id
+    run_number    = $run.run_number
+    status        = $run.status
+    conclusion    = $run.conclusion
+    html_url      = $run.html_url
     workflow_name = $run.name
     workflow_path = $run.path
-    jobs = $jobs | ForEach-Object { @{ name = $_.name; status = $_.status; conclusion = $_.conclusion } }
+    jobs          = $jobs | ForEach-Object { @{ name = $_.name; status = $_.status; conclusion = $_.conclusion } }
   }
 
   Save-SummaryJson $summary
