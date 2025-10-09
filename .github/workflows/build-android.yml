@@ -457,15 +457,8 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     needs: build-android
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      actions: read
-      actions: write
-      id-token: write
-    env:
-      GITHUB_TOKEN: ${{ github.token }}
-      GH_TOKEN: ${{ github.token }}
-      OIDC_AUDIENCE: ${{ secrets.OIDC_AUDIENCE }}
+    # Job-level permissions/env removed to avoid potential YAML parse issues.
+    # Permissions are now defined at workflow top-level.
     steps:
       - name: Download APK artifacts
         uses: actions/download-artifact@v4
@@ -501,13 +494,13 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
 
       - name: Request OIDC ID token (optional, for cloud federation)
-        if: ${{ env.OIDC_AUDIENCE != '' }}
+        if: ${{ secrets.OIDC_AUDIENCE != '' }}
         shell: bash
         run: |
           set -e
-          echo "Requesting OIDC ID token for audience: ${OIDC_AUDIENCE}"
+          echo "Requesting OIDC ID token for audience: ${{ secrets.OIDC_AUDIENCE }}"
           curl -s -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${OIDC_AUDIENCE}" > /tmp/oidc_token.json
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${{ secrets.OIDC_AUDIENCE }}" > /tmp/oidc_token.json
           echo "OIDC token acquired (json written to /tmp/oidc_token.json)"
       - name: Publish GitHub Release with assets
         uses: softprops/action-gh-release@v1
