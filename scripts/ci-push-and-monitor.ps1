@@ -154,6 +154,28 @@ function Find-Run-Fallback {
   return $null
 }
 
+# Fallback 3: use gh run list filtered by commit to get the run reliably
+function Find-Run-ByGhCommit {
+  param([string]$Sha)
+  try {
+    $listJson = (& gh run list --commit $Sha --json databaseId,headSha,status,conclusion,workflowName,displayTitle,url 2>$null)
+    if (-not $listJson) { return $null }
+    $arr = $listJson | ConvertFrom-Json
+    # Normalize shape to match REST run object where possible
+    $norm = $arr | Where-Object { $_.headSha -eq $Sha } | ForEach-Object {
+      [pscustomobject]@{
+        id = $_.databaseId
+        status = $_.status
+        conclusion = $_.conclusion
+        name = $_.workflowName
+        html_url = $_.url
+        head_sha = $_.headSha
+      }
+    }
+    return $norm
+  } catch { return $null }
+}
+
 function Save-SummaryJson {
   param($obj)
   $outPath = 'scripts/.ci-last-run.json'
@@ -226,6 +248,16 @@ try {
     if ($runsGh -and $runsGh.Count -gt 0) {
       $run = $runsGh[0]
       Write-Info ("Found run via gh: run_id=" + $run.id + ", status=" + $run.status)
+      break
+    }
+    # Fallback 3: filter by commit via gh run list
+    $runsGhCommit = Find-Run-ByGhCommit -Sha $sha
+    if ($runsGhCommit -and $runsGhCommit.Count -gt 0) {
+      $run = $runsGhCommit[0]
+      Write-Info ("Found run via gh commit: run_id=" + $run.id + ", status=" + $run.status)
+      # Enrich run with REST details
+      $restRun = Get-RunById -Owner $owner -Repo $repo -RunId $run.id -Token $token
+      if ($restRun) { $run = $restRun }
       break
     }
     # Fallback 2: search by workflow name
