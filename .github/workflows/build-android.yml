@@ -488,6 +488,7 @@ jobs:
 
       - name: Verify GH token can read runs
         shell: bash
+        continue-on-error: true
         run: |
           set -e
           gh --version

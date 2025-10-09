@@ -1,7 +1,16 @@
 ﻿{
+    "ok":  true,
+    "tag":  "v1.1.99-ci3",
     "branch":  "main",
-    "ok":  false,
-    "actions_url":  "https://github.com/mike652638/mood-flow/actions?query=event%3Apush",
-    "reason":  "run_not_found",
-    "tag":  "v1.1.99-ci2"
+    "head_sha":  "ca425b7c392dcd654dfbb159e40961785009a91c",
+    "run_id":  18379615189,
+    "run_number":  43,
+    "status":  "completed",
+    "conclusion":  "failure",
+    "html_url":  "https://github.com/mike652638/mood-flow/actions/runs/18379615189",
+    "workflow_name":  ".github/workflows/build-android.yml",
+    "workflow_path":  ".github/workflows/build-android.yml",
+    "jobs":  {
+
+             }
 }
