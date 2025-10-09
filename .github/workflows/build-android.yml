@@ -82,6 +82,67 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Sync Android versionName/versionCode (tag/env override)
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        shell: bash
+        run: |
+          set -e
+          FILE="android/app/build.gradle"
+          if [ ! -f "$FILE" ]; then
+            echo "build.gradle not found at $FILE; skip"
+            exit 0
+          fi
+
+          TAG="${GITHUB_REF_NAME}"
+          OVERRIDE_NAME="${VERSION_NAME_OVERRIDE:-}"
+          OVERRIDE_CODE="${VERSION_CODE_OVERRIDE:-}"
+
+          # Determine base semantic version (drop any -ci suffix) or use override
+          if [ -n "$OVERRIDE_NAME" ]; then
+            BASE_VERSION="$OVERRIDE_NAME"
+          else
+            BASE_VERSION=$(echo "$TAG" | sed -E 's/^v([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+          fi
+
+          CURRENT_NAME=$(grep -m1 -E 'versionName\s+"[^"]+"' "$FILE" | sed -E 's/.*"([^"]+)".*/\1/' || true)
+          CURRENT_CODE=$(grep -m1 -E 'versionCode\s+[0-9]+' "$FILE" | sed -E 's/.*versionCode\s+([0-9]+).*/\1/' || echo 1)
+
+          # Compute new versionName
+          NEW_NAME="$CURRENT_NAME"
+          if [ -n "$BASE_VERSION" ] && echo "$BASE_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            NEW_NAME="$BASE_VERSION"
+          fi
+
+          # Compute new versionCode (override > run_number > bump)
+          if [ -n "$OVERRIDE_CODE" ] && echo "$OVERRIDE_CODE" | grep -Eq '^[0-9]+$'; then
+            NEW_CODE="$OVERRIDE_CODE"
+          else
+            RUN="${GITHUB_RUN_NUMBER}"
+            CAND="${RUN:-0}"
+            if [ "$CAND" -le "$CURRENT_CODE" ]; then
+              NEW_CODE=$((CURRENT_CODE + 1))
+            else
+              NEW_CODE="$CAND"
+            fi
+          fi
+
+          # Apply changes
+          sed -i -E "s/versionName\s+\"[^\"]+\"/versionName \"${NEW_NAME}\"/" "$FILE"
+          if grep -q -E 'versionCode\s+[0-9]+' "$FILE"; then
+            sed -i -E "s/versionCode\s+[0-9]+/versionCode ${NEW_CODE}/" "$FILE"
+          else
+            # Insert versionCode if missing, next line after versionName
+            awk -v code="$NEW_CODE" '
+              /versionName\s+\"/ && !vc { print; print "        versionCode " code; vc=1; next }
+              { print }
+            ' "$FILE" > "$FILE.tmp" && mv "$FILE.tmp" "$FILE"
+          fi
+
+          echo "Synced versionName: ${CURRENT_NAME} -> ${NEW_NAME}"
+          echo "Synced versionCode: ${CURRENT_CODE} -> ${NEW_CODE}"
+          echo "VERSION_NAME=${NEW_NAME}" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=${NEW_CODE}" >> "$GITHUB_ENV"
+
       - name: Validate App IDs consistency (applicationId vs capacitor appId)
         shell: bash
         run: |
@@ -143,7 +204,15 @@ jobs:
       #   shell: bash
 
       - name: Tag artifacts (release/signed/internal/store)
-        run: node scripts/tag-artifacts.cjs --labels "release,signed,sinternal,store" --product mood-flow
+        shell: bash
+        run: |
+          set -e
+          CMD=(node scripts/tag-artifacts.cjs --labels "release,signed,sinternal,store" --product mood-flow)
+          if [ -n "$VERSION_NAME" ]; then
+            CMD+=(--version "$VERSION_NAME")
+          fi
+          echo "Running: ${CMD[*]}"
+          "${CMD[@]}"
 
       - name: Generate checksums for tagged artifacts (APK/AAB)
         if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
