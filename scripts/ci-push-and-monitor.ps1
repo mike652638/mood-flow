@@ -280,21 +280,21 @@ try {
     $runs = Get-Run-ByHeadSha -Owner $owner -Repo $repo -Sha $sha -Token $token
     if ($runs -and $runs.Count -gt 0) {
       $run = $runs[0]
-      Write-Info ("Found run: run_id=" + $run.id + ", status=" + $run.status)
+      Write-Info ("Found run: run_id=" + $run.id + ", status=" + $run.status + " (elapsed " + (Get-ElapsedStr $monitorStart) + ")")
       break
     }
     # Fallback with gh CLI (in case REST indexing or filter fails)
     $runsGh = Find-Run-Fallback -Owner $owner -Repo $repo -Sha $sha
     if ($runsGh -and $runsGh.Count -gt 0) {
       $run = $runsGh[0]
-      Write-Info ("Found run via gh: run_id=" + $run.id + ", status=" + $run.status)
+      Write-Info ("Found run via gh: run_id=" + $run.id + ", status=" + $run.status + " (elapsed " + (Get-ElapsedStr $monitorStart) + ")")
       break
     }
     # Fallback 3: filter by commit via gh run list
     $runsGhCommit = Find-Run-ByGhCommit -CommitSha $sha
     if ($runsGhCommit -and $runsGhCommit.Count -gt 0) {
       $run = $runsGhCommit[0]
-      Write-Info ("Found run via gh commit: run_id=" + $run.id + ", status=" + $run.status)
+      Write-Info ("Found run via gh commit: run_id=" + $run.id + ", status=" + $run.status + " (elapsed " + (Get-ElapsedStr $monitorStart) + ")")
       # Enrich run with REST details
       $restRun = Get-RunById -Owner $owner -Repo $repo -RunId ([long]$run.id) -Token $token
       if ($restRun) { $run = $restRun }
@@ -304,10 +304,10 @@ try {
     $runsWf = Find-Run-ByWorkflow -Owner $owner -Repo $repo -Sha $sha
     if ($runsWf -and $runsWf.Count -gt 0) {
       $run = $runsWf[0]
-      Write-Info ("Found run via workflow: run_id=" + $run.id + ", status=" + $run.status)
+      Write-Info ("Found run via workflow: run_id=" + $run.id + ", status=" + $run.status + " (elapsed " + (Get-ElapsedStr $monitorStart) + ")")
       break
     }
-    Write-Info 'Run not indexed yet; waiting...'
+    Write-Info ("Run not indexed yet; waiting... (elapsed " + (Get-ElapsedStr $monitorStart) + ")")
     Start-Sleep -Seconds $PollIntervalSeconds
   }
 
