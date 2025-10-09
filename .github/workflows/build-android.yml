@@ -19,6 +19,8 @@ on:
 
 permissions:
   contents: write
+  actions: write
+  id-token: write
 
 # 并发策略：同一标签仅保留最新运行，取消进行中的重复运行
 concurrency:
