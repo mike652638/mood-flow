@@ -225,6 +225,49 @@ function Save-SummaryJson {
   }
 }
 
+# Download job logs (zip) via GitHub REST and return extracted text as a single string
+function Get-JobLogsText {
+  param([string]$Owner, [string]$Repo, [long]$JobId, [string]$Token)
+  try {
+    $headers = @{ 'Accept' = 'application/zip' }
+    if ($Token) { $headers['Authorization'] = ('Bearer ' + $Token); $headers['X-GitHub-Api-Version'] = '2022-11-28' }
+    $url = ('https://api.github.com/repos/' + $Owner + '/' + $Repo + '/actions/jobs/' + $JobId + '/logs')
+    $tmpZip = [System.IO.Path]::GetTempFileName()
+    Invoke-RestMethod -Uri $url -Headers $headers -Method GET -OutFile $tmpZip
+    $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ('ghlogs_' + $JobId)
+    if (Test-Path $tmpDir) { Remove-Item -Recurse -Force $tmpDir }
+    New-Item -ItemType Directory -Path $tmpDir | Out-Null
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($tmpZip, $tmpDir)
+    Remove-Item $tmpZip -Force
+    $sb = New-Object System.Text.StringBuilder
+    Get-ChildItem -Path $tmpDir -Recurse -File | ForEach-Object {
+      try { $txt = Get-Content $_.FullName -Raw } catch { $txt = '' }
+      if ($txt) { [void]$sb.AppendLine($txt) }
+    }
+    try { Remove-Item -Recurse -Force $tmpDir } catch {}
+    return $sb.ToString()
+  }
+  catch {
+    Write-Warn ("Failed to download/parse job logs: " + $_.Exception.Message)
+    return $null
+  }
+}
+
+# Extract Cloudflare R2 public APK URL from logs where update-updates-json.cjs prints command line
+function Extract-R2Url-FromLogs {
+  param([string]$LogsText)
+  if (-not $LogsText) { return $null }
+  # Look for: Running: node scripts/update-updates-json.cjs --apk-url https://... .apk
+  $pattern = 'Running:\s+node\s+scripts/update-updates-json\.cjs\s+--apk-url\s+(https?://[^\s]+\.apk)'
+  $m = [regex]::Match($LogsText, $pattern)
+  if ($m.Success) { return $m.Groups[1].Value }
+  # Fallback: look for mood-flow-*.apk public URL printed elsewhere
+  $m2 = [regex]::Match($LogsText, '(https?://[^\s]+/releases/mood-flow-[^\s]+\.apk)')
+  if ($m2.Success) { return $m2.Groups[1].Value }
+  return $null
+}
+
 try {
   Ensure-RepoRoot
   $br = Get-Branch
@@ -342,11 +385,40 @@ try {
     workflow_name = $run.name
     workflow_path = $run.path
     jobs          = $jobs | ForEach-Object { @{ name = $_.name; status = $_.status; conclusion = $_.conclusion } }
+    release_url   = "https://github.com/$owner/$repo/releases/tag/$tagName"
+    r2_apk_url    = $null
+  }
+
+  # Attempt to extract R2 public URL from build job logs
+  try {
+    if ($jobs) {
+      $buildJob = $jobs | Where-Object { $_.name -eq 'build-android' } | Select-Object -First 1
+      if ($buildJob -and $buildJob.id) {
+        $logsText = Get-JobLogsText -Owner $owner -Repo $repo -JobId ([long]$buildJob.id) -Token $token
+        $r2Url = Extract-R2Url-FromLogs -LogsText $logsText
+        if ($r2Url) {
+          $summary.r2_apk_url = $r2Url
+          Write-Ok ("Detected R2 APK URL: " + $r2Url)
+        }
+        else {
+          Write-Warn 'R2 APK URL not found in logs; it may be unavailable or secrets not set.'
+        }
+      }
+    }
+  }
+  catch {
+    Write-Warn ("Failed to extract R2 URL from logs: " + $_.Exception.Message)
   }
 
   Save-SummaryJson $summary
   if ($summary.html_url) {
     Write-Ok ("Run URL: " + $summary.html_url)
+  }
+  if ($summary.release_url) {
+    Write-Ok ("Release URL: " + $summary.release_url)
+  }
+  if ($summary.r2_apk_url) {
+    Write-Ok ("Cloudflare R2 APK URL: " + $summary.r2_apk_url)
   }
   Write-Ok ("Final: " + $summary.status + " / " + $summary.conclusion)
   if ($jobs) {

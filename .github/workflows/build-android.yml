@@ -252,7 +252,7 @@ jobs:
           M_IN="${{ inputs.mandatory }}"
           case "$M_IN" in
             true|True|TRUE|1|yes|Yes|YES) MANDATORY_STR="true" ;;
-            false|False|FALSE|0|no|No|NO|""|) MANDATORY_STR="false" ;;
+            false|False|FALSE|0|no|No|NO|"") MANDATORY_STR="false" ;;
             *) MANDATORY_STR="false" ;;
           esac
           echo "MANDATORY_STR=${MANDATORY_STR}" >> "$GITHUB_ENV"
