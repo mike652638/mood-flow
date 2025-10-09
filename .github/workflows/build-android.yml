@@ -474,10 +474,12 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           body_path: dist/meta/release-notes.md
+          # Avoid duplicate uploads: store-labeled AABs are already included in dist/aab/**
+          # Also allow overwriting existing assets on re-runs
+          overwrite: true
           files: |
             dist/apk/**
             dist/aab/**
-            dist/aab-store/**
             dist/meta/**
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
