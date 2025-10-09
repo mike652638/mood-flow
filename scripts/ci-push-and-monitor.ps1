@@ -239,21 +239,25 @@ try {
   while ((Get-Date) -lt $deadline) {
     $runs = Get-Run-ByHeadSha -Owner $owner -Repo $repo -Sha $sha -Token $token
     if ($runs -and $runs.Count -gt 0) {
-      $run = $runs[0]
+      # Prefer tag push runs: head_branch is null/empty for tag-triggered runs
+      $run = ($runs | Where-Object { -not $_.head_branch -or $_.head_branch -eq '' } | Select-Object -First 1)
+      if (-not $run) { $run = $runs[0] }
       Write-Info ("Found run: run_id=" + $run.id + ", status=" + $run.status)
       break
     }
     # Fallback with gh CLI (in case REST indexing or filter fails)
     $runsGh = Find-Run-Fallback -Owner $owner -Repo $repo -Sha $sha
     if ($runsGh -and $runsGh.Count -gt 0) {
-      $run = $runsGh[0]
+      $run = ($runsGh | Where-Object { -not $_.head_branch -or $_.head_branch -eq '' } | Select-Object -First 1)
+      if (-not $run) { $run = $runsGh[0] }
       Write-Info ("Found run via gh: run_id=" + $run.id + ", status=" + $run.status)
       break
     }
     # Fallback 3: filter by commit via gh run list
     $runsGhCommit = Find-Run-ByGhCommit -Sha $sha
     if ($runsGhCommit -and $runsGhCommit.Count -gt 0) {
-      $run = $runsGhCommit[0]
+      $run = ($runsGhCommit | Where-Object { -not $_.head_branch -or $_.head_branch -eq '' } | Select-Object -First 1)
+      if (-not $run) { $run = $runsGhCommit[0] }
       Write-Info ("Found run via gh commit: run_id=" + $run.id + ", status=" + $run.status)
       # Enrich run with REST details
       $restRun = Get-RunById -Owner $owner -Repo $repo -RunId $run.id -Token $token
