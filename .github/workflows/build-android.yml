@@ -11,6 +11,18 @@ on:
         description: 'Prefer emulator when selecting device'
         type: boolean
         default: false
+      update_url:
+        description: 'Override remote updates.json URL (e.g., https://example.com/releases/updates.json)'
+        type: string
+        required: false
+      version_name:
+        description: 'Override Android versionName (semantic version, e.g., 1.2.3)'
+        type: string
+        required: false
+      version_code:
+        description: 'Override Android versionCode (integer)'
+        type: string
+        required: false
   # 优化：仅在版本标签触发（避免同时因分支推送与标签推送触发两次）
   push:
     tags: ['v*', 'v*-ci*']
@@ -27,8 +39,8 @@ concurrency:
 
 jobs:
   build-android:
-    # 仅在标签运行，避免因分支 push 引发重复构建
-    if: startsWith(github.ref, 'refs/tags/')
+    # 允许标签或手动触发运行；避免因分支 push 引发重复构建
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     env:
       # build-android.cmd will respect SKIP_SMOKE_TEST/PREFER_EMULATOR when used by CI
@@ -67,6 +79,25 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Set update URL env (R2 base)
+        shell: bash
+        run: |
+          set -e
+          # Prefer manual override if provided
+          CUSTOM="${{ inputs.update_url }}"
+          if [ -n "$CUSTOM" ]; then
+            UPD="$CUSTOM"
+          elif [ -n "${R2_PUBLIC_BASE}" ]; then
+            UPD="${R2_PUBLIC_BASE}/releases/updates.json"
+          elif [ -n "${R2_BUCKET}" ]; then
+            UPD="https://${R2_BUCKET}.r2.dev/releases/updates.json"
+          else
+            # Fallback to local path; app 端将有多源兜底逻辑
+            UPD="/updates.json"
+          fi
+          echo "VITE_APP_UPDATE_URL=${UPD}" >> "$GITHUB_ENV"
+          echo "Resolved update URL: ${UPD}"
+
       - name: Install dependencies
         run: npm ci
 
@@ -78,12 +109,13 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_APP_UPDATE_URL: ${{ env.VITE_APP_UPDATE_URL }}
 
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Sync Android versionName/versionCode (tag/env override)
-        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+      - name: Sync Android versionName/versionCode (tag/env/inputs override)
+        if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
         shell: bash
         run: |
           set -e
@@ -94,8 +126,15 @@ jobs:
           fi
 
           TAG="${GITHUB_REF_NAME}"
-          OVERRIDE_NAME="${VERSION_NAME_OVERRIDE:-}"
-          OVERRIDE_CODE="${VERSION_CODE_OVERRIDE:-}"
+          # Resolve overrides from workflow_dispatch inputs first, then env variables
+          OVERRIDE_NAME_INPUT="${{ inputs.version_name }}"
+          OVERRIDE_CODE_INPUT="${{ inputs.version_code }}"
+          OVERRIDE_NAME_ENV="${VERSION_NAME_OVERRIDE:-}"
+          OVERRIDE_CODE_ENV="${VERSION_CODE_OVERRIDE:-}"
+          OVERRIDE_NAME="$OVERRIDE_NAME_INPUT"
+          if [ -z "$OVERRIDE_NAME" ]; then OVERRIDE_NAME="$OVERRIDE_NAME_ENV"; fi
+          OVERRIDE_CODE="$OVERRIDE_CODE_INPUT"
+          if [ -z "$OVERRIDE_CODE" ]; then OVERRIDE_CODE="$OVERRIDE_CODE_ENV"; fi
 
           # Determine base semantic version (drop any -ci suffix) or use override
           if [ -n "$OVERRIDE_NAME" ]; then
@@ -298,6 +337,23 @@ jobs:
           if [ -n "$NOTES_SUMMARY" ]; then CMD+=(--notes "$NOTES_SUMMARY"); fi
           echo "Running: ${CMD[*]}"
           "${CMD[@]}"
+
+      - name: Upload updates.json to Cloudflare R2
+        if: ${{ env.R2_ACCOUNT_ID != '' && env.R2_ACCESS_KEY_ID != '' && env.R2_SECRET_ACCESS_KEY != '' && env.R2_BUCKET != '' }}
+        shell: bash
+        run: |
+          set -e
+          echo "Installing AWS CLI (for S3-compatible R2)"
+          pip3 install --user awscli
+          export PATH="$HOME/.local/bin:$PATH"
+          echo "Configuring AWS CLI credentials"
+          aws configure set aws_access_key_id "$R2_ACCESS_KEY_ID"
+          aws configure set aws_secret_access_key "$R2_SECRET_ACCESS_KEY"
+          aws configure set default.region us-east-1
+          echo "Uploading updates.json to R2"
+          SRC="public/updates.json"
+          DEST="s3://${R2_BUCKET}/releases/updates.json"
+          aws --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" s3 cp "$SRC" "$DEST" --content-type application/json --acl public-read || true
 
       - name: Commit updates.json back to repo (branch runs only)
         if: ${{ env.R2_URL != '' && github.event_name != 'pull_request' && startsWith(github.ref, 'refs/heads/') }}

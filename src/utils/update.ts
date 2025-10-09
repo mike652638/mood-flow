@@ -38,19 +38,54 @@ export function compareVersions(a: string, b: string): number {
 
 export async function checkForUpdate(customUrl?: string): Promise<UpdateCheckResult> {
   const current = getCurrentVersion();
-  const envObj = (import.meta as unknown as { env?: { VITE_APP_UPDATE_URL?: string } }).env;
-  const envUrl = envObj?.VITE_APP_UPDATE_URL;
-  const url = (customUrl ?? envUrl ?? '/updates.json') as string;
-  try {
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) throw new Error(`Update source ${url} responded ${res.status}`);
-    const info = (await res.json()) as UpdateInfo;
-    const hasUpdate = compareVersions(info.latestVersion, current) > 0;
-    return { currentVersion: current, info, hasUpdate, sourceUrl: url };
-  } catch (err) {
-    console.warn('Update check failed:', err);
-    return { currentVersion: current, info: undefined, hasUpdate: false, sourceUrl: url };
+  const envObj = (import.meta as unknown as { env?: { VITE_APP_UPDATE_URL?: string; VITE_APP_UPDATES_BASE?: string } }).env;
+  const envUrl = envObj?.VITE_APP_UPDATE_URL as string | undefined;
+  const baseUrl = envObj?.VITE_APP_UPDATES_BASE as string | undefined;
+  const candidates: string[] = [];
+  if (customUrl) candidates.push(customUrl);
+  if (envUrl) candidates.push(envUrl);
+  if (baseUrl) candidates.push(baseUrl.endsWith('/') ? `${baseUrl}updates.json` : `${baseUrl}/updates.json`);
+  // 本地包内作为最后兜底
+  candidates.push('/updates.json');
+
+  let bestInfo: UpdateInfo | undefined;
+  let bestSource = '';
+  for (const url of dedupe(candidates)) {
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`Update source ${url} responded ${res.status}`);
+      const info = (await res.json()) as UpdateInfo;
+      if (!bestInfo || compareVersions(info.latestVersion, bestInfo.latestVersion) > 0) {
+        bestInfo = info;
+        bestSource = url;
+      }
+      // 如果该源已比当前版本新，提前返回
+      if (compareVersions(info.latestVersion, current) > 0) {
+        return { currentVersion: current, info, hasUpdate: true, sourceUrl: url };
+      }
+    } catch (err) {
+      console.warn('Update check failed on source:', url, err);
+    }
   }
+  if (bestInfo) {
+    const hasUpdate = compareVersions(bestInfo.latestVersion, current) > 0;
+    return { currentVersion: current, info: bestInfo, hasUpdate, sourceUrl: bestSource };
+  }
+  // 所有源均失败
+  const fallback = candidates[0] || '/updates.json';
+  return { currentVersion: current, info: undefined, hasUpdate: false, sourceUrl: fallback };
+}
+
+function dedupe(arr: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of arr) {
+    if (!s) continue;
+    if (seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+  }
+  return out;
 }
 
 // 自动检查更新偏好（默认开启）
