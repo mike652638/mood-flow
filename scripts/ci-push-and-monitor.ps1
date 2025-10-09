@@ -161,28 +161,42 @@ function Find-Run-Fallback {
 }
 
 # Fallback 3: use gh run list filtered by commit to get the run reliably
-function Find-Run-ByGhCommit {
-  param([string]$Sha)
-  try {
-    $listJson = (& gh run list --commit $Sha --json databaseId, headSha, status, conclusion, workflowName, displayTitle, url 2>$null)
-    if (-not $listJson) { return $null }
-    $arr = $listJson | ConvertFrom-Json
-    # Normalize shape to match REST run object where possible
-    $norm = $arr | Where-Object { $_.headSha -eq $Sha } | ForEach-Object {
-      [pscustomobject]@{
-        id         = $_.databaseId
-        status     = $_.status
-        conclusion = $_.conclusion
-        name       = $_.workflowName
-        html_url   = $_.url
-        head_sha   = $_.headSha
-      }
+function Find-Run-ByHeadSha {
+    param(
+        [string]$Owner,
+        [string]$Repo,
+        [string]$HeadSha,
+        [string]$Branch,
+        [string]$Event = "push"
+    )
+    Write-Host "[DEBUG] Find-Run-ByHeadSha: Searching for sha=$HeadSha, branch=$Branch, event=$Event"
+    $url = "https://api.github.com/repos/$Owner/$Repo/actions/runs?head_sha=$HeadSha&branch=$Branch&event=$Event&status=in_progress,queued,requested,waiting"
+    $runs = Invoke-GhRest -Method GET -Uri $url
+    if ($runs -and $runs.total_count -gt 0) {
+        # Sort by created_at descending to get the latest run
+        $latestRun = $runs.workflow_runs | Sort-Object -Property created_at -Descending | Select-Object -First 1
+        Write-Host "[DEBUG] Find-Run-ByHeadSha: Found $($runs.total_count) runs, latest is $($latestRun.id)"
+        return $latestRun
     }
-    return $norm
-  }
-  catch { return $null }
+    return $null
 }
 
+function Find-Run-ByGhCommit {
+    param(
+        [string]$CommitSha
+    )
+    Write-Host "[DEBUG] Find-Run-ByGhCommit: Searching for commit=$CommitSha"
+    $run = gh run list --commit "$CommitSha" --json databaseId,headBranch,headSha,status,conclusion,workflowName,displayTitle,url --jq '.[0]' | ConvertFrom-Json -ErrorAction SilentlyContinue
+    if ($run) {
+        Write-Host "[DEBUG] Find-Run-ByGhCommit: Found run $($run.databaseId) via gh commit list"
+        # The output from `gh run list` is good, but let's use the REST API to get the full object for consistency
+        return Get-RunById -RunId $run.databaseId
+    }
+    return $null
+}
+
+
+# Main script execution
 function Save-SummaryJson {
   param($obj)
   $outPath = 'scripts/.ci-last-run.json'
