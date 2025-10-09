@@ -101,7 +101,7 @@ function Get-Run-ByHeadSha {
 }
 
 function Get-RunJobs {
-  param([string]$Owner, [string]$Repo, [int]$RunId, [string]$Token)
+  param([string]$Owner, [string]$Repo, [long]$RunId, [string]$Token)
   $headers = @{ 'Accept' = 'application/vnd.github+json' }
   if ($Token) { $headers['Authorization'] = ('Bearer ' + $Token); $headers['X-GitHub-Api-Version'] = '2022-11-28' }
   $url = ('https://api.github.com/repos/' + $Owner + '/' + $Repo + '/actions/runs/' + $RunId + '/jobs?per_page=50')
@@ -135,7 +135,7 @@ function Find-Run-ByWorkflow {
 
 # Refresh run by id using REST to get latest status
 function Get-RunById {
-  param([string]$Owner, [string]$Repo, [int]$RunId, [string]$Token)
+  param([string]$Owner, [string]$Repo, [long]$RunId, [string]$Token)
   $headers = @{ 'Accept' = 'application/vnd.github+json' }
   if ($Token) { $headers['Authorization'] = ('Bearer ' + $Token); $headers['X-GitHub-Api-Version'] = '2022-11-28' }
   $url = ('https://api.github.com/repos/' + $Owner + '/' + $Repo + '/actions/runs/' + $RunId)
@@ -192,7 +192,7 @@ function Find-Run-ByGhCommit {
     if ($run) {
         Write-Host "[DEBUG] Find-Run-ByGhCommit: Found run $($run.databaseId) via gh commit list"
         # The output from `gh run list` is good, but let's use the REST API to get the full object for consistency
-        return Get-RunById -RunId $run.databaseId
+        return Get-RunById -RunId ([long]$run.databaseId)
     }
     return $null
 }
@@ -282,7 +282,7 @@ try {
       $run = $runsGhCommit[0]
       Write-Info ("Found run via gh commit: run_id=" + $run.id + ", status=" + $run.status)
       # Enrich run with REST details
-      $restRun = Get-RunById -Owner $owner -Repo $repo -RunId $run.id -Token $token
+      $restRun = Get-RunById -Owner $owner -Repo $repo -RunId ([long]$run.id) -Token $token
       if ($restRun) { $run = $restRun }
       break
     }
@@ -307,20 +307,20 @@ try {
   while ($run.status -ne 'completed' -and (Get-Date) -lt $deadline) {
     Write-Info ("Status: " + $run.status + ", waiting to complete...")
     Start-Sleep -Seconds $PollIntervalSeconds
-    $refreshed = Get-RunById -Owner $owner -Repo $repo -RunId $run.id -Token $token
+    $refreshed = Get-RunById -Owner $owner -Repo $repo -RunId ([long]$run.id) -Token $token
     if ($refreshed) { $run = $refreshed }
     if (-not $run) { break }
   }
 
   $jobs = $null
-  if ($run -and $run.id) { $jobs = Get-RunJobs -Owner $owner -Repo $repo -RunId $run.id -Token $token }
+  if ($run -and $run.id) { $jobs = Get-RunJobs -Owner $owner -Repo $repo -RunId ([long]$run.id) -Token $token }
 
   $summary = [ordered]@{
     ok            = $true
     tag           = $tagName
     branch        = $br
     head_sha      = $sha
-    run_id        = $run.id
+    run_id        = [long]$run.id
     run_number    = $run.run_number
     status        = $run.status
     conclusion    = $run.conclusion
