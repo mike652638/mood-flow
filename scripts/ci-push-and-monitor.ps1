@@ -15,6 +15,19 @@ function Write-Ok($msg) { $ts = Get-Timestamp; Write-Host "[OK   $ts] $msg" -For
 function Write-Warn($msg) { $ts = Get-Timestamp; Write-Host "[WARN $ts] $msg" -ForegroundColor Yellow }
 function Write-Err($msg) { $ts = Get-Timestamp; Write-Host "[ERR  $ts] $msg" -ForegroundColor Red }
 
+# Format elapsed time since a given start timestamp (MM:SS or HH:MM:SS)
+function Get-ElapsedStr([datetime]$start) {
+  try {
+    $ts = New-TimeSpan -Start $start -End (Get-Date)
+    $hours = [int]$ts.TotalHours
+    $mins = $ts.Minutes
+    $secs = $ts.Seconds
+    if ($hours -gt 0) { return ("{0:D2}:{1:D2}:{2:D2}" -f $hours, $mins, $secs) }
+    else { return ("{0:D2}:{1:D2}" -f $mins, $secs) }
+  }
+  catch { return "00:00" }
+}
+
 function Ensure-RepoRoot {
   $dir = $null
   try { $dir = $PSScriptRoot } catch {}
@@ -261,6 +274,7 @@ try {
   }
 
   $deadline = (Get-Date).AddSeconds($WaitSeconds)
+  $monitorStart = Get-Date
   $run = $null
   while ((Get-Date) -lt $deadline) {
     $runs = Get-Run-ByHeadSha -Owner $owner -Repo $repo -Sha $sha -Token $token
@@ -305,7 +319,7 @@ try {
   }
 
   while ($run.status -ne 'completed' -and (Get-Date) -lt $deadline) {
-    Write-Info ("Status: " + $run.status + ", waiting to complete...")
+    Write-Info ("Status: " + $run.status + ", waiting to complete... (elapsed " + (Get-ElapsedStr $monitorStart) + ")")
     Start-Sleep -Seconds $PollIntervalSeconds
     $refreshed = Get-RunById -Owner $owner -Repo $repo -RunId ([long]$run.id) -Token $token
     if ($refreshed) { $run = $refreshed }
