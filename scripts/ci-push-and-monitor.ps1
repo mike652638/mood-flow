@@ -112,6 +112,34 @@ function Get-RunJobs {
   }
 }
 
+# Fallback 2: locate run by workflow name using gh workflow list -> workflow runs
+function Find-Run-ByWorkflow {
+  param([string]$Owner, [string]$Repo, [string]$Sha)
+  try {
+    $wfsJson = (& gh workflow list --json id,name 2>$null)
+    if (-not $wfsJson) { return $null }
+    $wfs = $wfsJson | ConvertFrom-Json
+    $wf = $wfs | Where-Object { $_.name -eq 'Build Android APK' } | Select-Object -First 1
+    if (-not $wf) { return $null }
+    $runsJson = (& gh api ("repos/"+$Owner+"/"+$Repo+"/actions/workflows/"+$wf.id+"/runs?event=push&per_page=50") 2>$null)
+    if (-not $runsJson) { return $null }
+    $obj = $runsJson | ConvertFrom-Json
+    $runs = $obj.workflow_runs | Where-Object { $_.head_sha -eq $Sha }
+    return $runs
+  } catch { return $null }
+}
+
+# Refresh run by id using REST to get latest status
+function Get-RunById {
+  param([string]$Owner, [string]$Repo, [int]$RunId, [string]$Token)
+  $headers = @{ 'Accept' = 'application/vnd.github+json' }
+  if ($Token) { $headers['Authorization'] = ('Bearer ' + $Token); $headers['X-GitHub-Api-Version'] = '2022-11-28' }
+  $url = ('https://api.github.com/repos/' + $Owner + '/' + $Repo + '/actions/runs/' + $RunId)
+  try {
+    return Invoke-RestMethod -Uri $url -Headers $headers -Method GET
+  } catch { return $null }
+}
+
 # Fallback: use gh CLI to list recent push runs and filter by head_sha
 function Find-Run-Fallback {
   param([string]$Owner, [string]$Repo, [string]$Sha)
@@ -200,6 +228,13 @@ try {
       Write-Info ("Found run via gh: run_id=" + $run.id + ", status=" + $run.status)
       break
     }
+    # Fallback 2: search by workflow name
+    $runsWf = Find-Run-ByWorkflow -Owner $owner -Repo $repo -Sha $sha
+    if ($runsWf -and $runsWf.Count -gt 0) {
+      $run = $runsWf[0]
+      Write-Info ("Found run via workflow: run_id=" + $run.id + ", status=" + $run.status)
+      break
+    }
     Write-Info 'Run not indexed yet; waiting...'
     Start-Sleep -Seconds $PollIntervalSeconds
   }
@@ -214,8 +249,8 @@ try {
   while ($run.status -ne 'completed' -and (Get-Date) -lt $deadline) {
     Write-Info ("Status: " + $run.status + ", waiting to complete...")
     Start-Sleep -Seconds $PollIntervalSeconds
-    $runs = Get-Run-ByHeadSha -Owner $owner -Repo $repo -Sha $sha -Token $token
-    $run = $runs | Where-Object { $_.id -eq $run.id } | Select-Object -First 1
+    $refreshed = Get-RunById -Owner $owner -Repo $repo -RunId $run.id -Token $token
+    if ($refreshed) { $run = $refreshed }
     if (-not $run) { break }
   }
 
