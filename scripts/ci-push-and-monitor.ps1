@@ -288,6 +288,16 @@ function Get-R2Url-FromLogs {
   # Public dev domain pattern: https://pub-<id>.r2.dev/...
   $m4 = [regex]::Match($LogsText, '(https?://[^\s]*\.r2\.dev/[^\s]+\.apk)')
   if ($m4.Success) { return $m4.Groups[1].Value }
+  # Fallback via updates.json: find resolved update URL in logs and fetch androidApkUrl
+  $m5 = [regex]::Match($LogsText, 'Resolved update URL:\s+(https?://[^\s]+/updates\.json)')
+  if ($m5.Success) {
+    $updatesUrl = $m5.Groups[1].Value
+    try {
+      $resp = Invoke-RestMethod -Uri $updatesUrl -Method GET -TimeoutSec 30 -Headers @{ Accept = 'application/json' }
+      if ($resp -and $resp.androidApkUrl) { return [string]$resp.androidApkUrl }
+    }
+    catch {}
+  }
   return $null
 }
 
