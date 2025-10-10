@@ -29,7 +29,7 @@ function Get-ElapsedStr([datetime]$start) {
   catch { return "00:00" }
 }
 
-function Ensure-RepoRoot {
+function Confirm-RepoRoot {
   $dir = $null
   try { $dir = $PSScriptRoot } catch {}
   if (-not $dir -and $MyInvocation -and $MyInvocation.MyCommand -and $MyInvocation.MyCommand.Path) {
@@ -61,12 +61,12 @@ function Get-Branch {
   return $b
 }
 
-function Has-Changes {
+function Test-Changes {
   $s = (& git status --porcelain)
   return [bool]$s
 }
 
-function Auto-Tag {
+function New-AutoTag {
   param([string]$TagPrefix)
   $gradlePath = 'android/app/build.gradle'
   $versionName = '0.0.0'
@@ -181,10 +181,10 @@ function Find-Run-ByHeadSha {
     [string]$Repo,
     [string]$HeadSha,
     [string]$Branch,
-    [string]$Event = "push"
+    [string]$WorkflowEvent = "push"
   )
-  Write-Host "[DEBUG] Find-Run-ByHeadSha: Searching for sha=$HeadSha, branch=$Branch, event=$Event"
-  $url = "https://api.github.com/repos/$Owner/$Repo/actions/runs?head_sha=$HeadSha&branch=$Branch&event=$Event&status=in_progress,queued,requested,waiting"
+  Write-Host "[DEBUG] Find-Run-ByHeadSha: Searching for sha=$HeadSha, branch=$Branch, event=$WorkflowEvent"
+    $url = "https://api.github.com/repos/$Owner/$Repo/actions/runs?head_sha=$HeadSha&branch=$Branch&event=$WorkflowEvent&status=in_progress,queued,requested,waiting"
   $runs = Invoke-GhRest -Method GET -Uri $url
   if ($runs -and $runs.total_count -gt 0) {
     # Sort by created_at descending to get the latest run
@@ -248,24 +248,12 @@ function Save-SummaryJson {
 function Get-JobLogsText {
   param([string]$Owner, [string]$Repo, [long]$JobId, [string]$Token)
   try {
-    $headers = @{ 'Accept' = 'application/zip' }
+    $headers = @{ 'Accept' = 'application/vnd.github+json' }
     if ($Token) { $headers['Authorization'] = ('Bearer ' + $Token); $headers['X-GitHub-Api-Version'] = '2022-11-28' }
     $url = ('https://api.github.com/repos/' + $Owner + '/' + $Repo + '/actions/jobs/' + $JobId + '/logs')
-    $tmpZip = [System.IO.Path]::GetTempFileName()
-    Invoke-RestMethod -Uri $url -Headers $headers -Method GET -OutFile $tmpZip
-    $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ('ghlogs_' + $JobId)
-    if (Test-Path $tmpDir) { Remove-Item -Recurse -Force $tmpDir }
-    New-Item -ItemType Directory -Path $tmpDir | Out-Null
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($tmpZip, $tmpDir)
-    Remove-Item $tmpZip -Force
-    $sb = New-Object System.Text.StringBuilder
-    Get-ChildItem -Path $tmpDir -Recurse -File | ForEach-Object {
-      try { $txt = Get-Content $_.FullName -Raw } catch { $txt = '' }
-      if ($txt) { [void]$sb.AppendLine($txt) }
-    }
-    try { Remove-Item -Recurse -Force $tmpDir } catch {}
-    return $sb.ToString()
+    # GitHub API returns plain text logs directly
+    $response = Invoke-RestMethod -Uri $url -Headers $headers -Method GET
+    return $response
   }
   catch {
     Write-Warn ("Failed to download/parse job logs: " + $_.Exception.Message)
@@ -274,7 +262,7 @@ function Get-JobLogsText {
 }
 
 # Extract Cloudflare R2 public APK URL from logs where update-updates-json.cjs prints command line
-function Extract-R2Url-FromLogs {
+function Get-R2Url-FromLogs {
   param([string]$LogsText)
   if (-not $LogsText) { return $null }
   # Look for: Running: node scripts/update-updates-json.cjs --apk-url https://... .apk
@@ -284,15 +272,18 @@ function Extract-R2Url-FromLogs {
   # Fallback: look for mood-flow-*.apk public URL printed elsewhere
   $m2 = [regex]::Match($LogsText, '(https?://[^\s]+/releases/mood-flow-[^\s]+\.apk)')
   if ($m2.Success) { return $m2.Groups[1].Value }
+  # Additional fallback: look for any R2 URL pattern
+  $m3 = [regex]::Match($LogsText, '(https?://[^\s]*\.r2\.cloudflarestorage\.com/[^\s]+\.apk)')
+  if ($m3.Success) { return $m3.Groups[1].Value }
   return $null
 }
 
 try {
-  Ensure-RepoRoot
+  Confirm-RepoRoot
   $br = Get-Branch
   Write-Info ("Target branch: " + $br)
   if (-not $SkipPush) {
-    if (Has-Changes) {
+    if (Test-Changes) {
       Write-Info 'Uncommitted changes detected, preparing commit'
       & git add -A
       $msg = if ($CommitMessage) { $CommitMessage } else { 'chore(ci): trigger Android CI run' }
@@ -308,7 +299,7 @@ try {
     Write-Ok 'Branch push done'
   }
 
-  $tagName = if ($Tag) { $Tag } else { Auto-Tag -TagPrefix $TagPrefix }
+  $tagName = if ($Tag) { $Tag } else { New-AutoTag -TagPrefix $TagPrefix }
   Write-Info ("Using tag: " + $tagName)
 
   if (-not $SkipPush) {
@@ -433,7 +424,7 @@ try {
       $buildJob = $jobs | Where-Object { $_.name -eq 'build-android' } | Select-Object -First 1
       if ($buildJob -and $buildJob.id) {
         $logsText = Get-JobLogsText -Owner $owner -Repo $repo -JobId ([long]$buildJob.id) -Token $token
-        $r2Url = Extract-R2Url-FromLogs -LogsText $logsText
+        $r2Url = Get-R2Url-FromLogs -LogsText $logsText
         if ($r2Url) {
           $summary.r2_apk_url = $r2Url
           Write-Ok ("Detected R2 APK URL: " + $r2Url)

@@ -1,7 +1,27 @@
 ﻿{
+    "ok":  true,
+    "tag":  "v1.2.3",
     "branch":  "main",
-    "ok":  false,
-    "actions_url":  "https://github.com/mike652638/mood-flow/actions?query=event%3Apush",
-    "reason":  "run_not_found",
-    "tag":  "v1.2.3"
+    "head_sha":  "9d4a64ff4a404e6dbc70706210e364533b1e29c0",
+    "run_id":  18395782000,
+    "run_number":  78,
+    "status":  "completed",
+    "conclusion":  "success",
+    "html_url":  "https://github.com/mike652638/mood-flow/actions/runs/18395782000",
+    "workflow_name":  "Build Android APK",
+    "workflow_path":  ".github/workflows/build-android.yml",
+    "jobs":  [
+                 {
+                     "status":  "completed",
+                     "name":  "build-android",
+                     "conclusion":  "success"
+                 },
+                 {
+                     "status":  "completed",
+                     "name":  "publish-release",
+                     "conclusion":  "success"
+                 }
+             ],
+    "release_url":  "https://github.com/mike652638/mood-flow/releases/tag/v1.2.3",
+    "r2_apk_url":  null
 }
