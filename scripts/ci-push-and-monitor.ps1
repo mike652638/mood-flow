@@ -100,22 +100,13 @@ function Get-GitHubToken {
 }
 
 function Get-Run-ByHeadSha {
-  param(
-    [string]$Owner,
-    [string]$Repo,
-    [string]$Sha,
-    [string]$Token,
-    [string]$WorkflowName = 'Build Android APK'
-  )
+  param([string]$Owner, [string]$Repo, [string]$Sha, [string]$Token)
   $headers = @{ 'Accept' = 'application/vnd.github+json' }
   if ($Token) { $headers['Authorization'] = ('Bearer ' + $Token); $headers['X-GitHub-Api-Version'] = '2022-11-28' }
-  # GitHub REST does not support filtering by head_sha on this endpoint; fetch recent push runs and filter locally
-  $url = ('https://api.github.com/repos/' + $Owner + '/' + $Repo + '/actions/runs?event=push&per_page=100')
+  $url = ('https://api.github.com/repos/' + $Owner + '/' + $Repo + '/actions/runs?head_sha=' + $Sha + '&per_page=50')
   try {
     $resp = Invoke-RestMethod -Uri $url -Headers $headers -Method GET
-    $runs = $resp.workflow_runs | Where-Object { $_.head_sha -eq $Sha }
-    if ($WorkflowName) { $runs = $runs | Where-Object { $_.name -eq $WorkflowName } }
-    return $runs
+    return $resp.workflow_runs
   }
   catch {
     Write-Warn ("Failed to fetch workflow runs: " + $_.Exception.Message)
@@ -184,22 +175,58 @@ function Find-Run-Fallback {
 }
 
 # Fallback 3: use gh run list filtered by commit to get the run reliably
-# Removed unused helper that referenced undefined Invoke-GhRest and unsupported status values
+function Find-Run-ByHeadSha {
+  param(
+    [string]$Owner,
+    [string]$Repo,
+    [string]$HeadSha,
+    [string]$Branch,
+    [string]$Event = "push"
+  )
+  Write-Host "[DEBUG] Find-Run-ByHeadSha: Searching for sha=$HeadSha, branch=$Branch, event=$Event"
+  $url = "https://api.github.com/repos/$Owner/$Repo/actions/runs?head_sha=$HeadSha&branch=$Branch&event=$Event&status=in_progress,queued,requested,waiting"
+  $runs = Invoke-GhRest -Method GET -Uri $url
+  if ($runs -and $runs.total_count -gt 0) {
+    # Sort by created_at descending to get the latest run
+    $latestRun = $runs.workflow_runs | Sort-Object -Property created_at -Descending | Select-Object -First 1
+    Write-Host "[DEBUG] Find-Run-ByHeadSha: Found $($runs.total_count) runs, latest is $($latestRun.id)"
+    return $latestRun
+  }
+  return $null
+}
 
 function Find-Run-ByGhCommit {
-    param(
-        [string]$CommitSha
-    )
-    Write-Host "[DEBUG] Find-Run-ByGhCommit: Searching for commit=$CommitSha"
-    $runJson = gh run list --commit "$CommitSha" --json "databaseId,headBranch,headSha,status,conclusion,workflowName,displayTitle,url" | ConvertFrom-Json -ErrorAction SilentlyContinue
-    $run = $runJson | Select-Object -First 1
-
-    if ($run) {
-        Write-Host "[DEBUG] Find-Run-ByGhCommit: Found run $($run.databaseId) via gh commit list"
-        # The output from `gh run list` is good, but let's use the REST API to get the full object for consistency
-        return Get-RunById -RunId ([long]$run.databaseId)
+  param(
+    [string]$CommitSha
+  )
+  Write-Host "[DEBUG] Find-Run-ByGhCommit: Searching for commit=$CommitSha"
+  try {
+    $runJson = gh run list --commit "$CommitSha" --json "databaseId,headBranch,headSha,status,conclusion,workflowName,displayTitle,url" 2>$null | ConvertFrom-Json -ErrorAction SilentlyContinue
+    if ($runJson -and $runJson.Count -gt 0) {
+      # Filter for "Build Android APK" workflow specifically
+      $targetRun = $runJson | Where-Object { $_.workflowName -eq 'Build Android APK' } | Select-Object -First 1
+      if ($targetRun) {
+        Write-Host "[DEBUG] Find-Run-ByGhCommit: Found Build Android APK run $($targetRun.databaseId) via gh commit list"
+        # Convert to a format compatible with REST API response
+        return @{
+          id = [long]$targetRun.databaseId
+          status = $targetRun.status
+          conclusion = $targetRun.conclusion
+          name = $targetRun.workflowName
+          html_url = $targetRun.url
+          head_sha = $targetRun.headSha
+        }
+      } else {
+        Write-Host "[DEBUG] Find-Run-ByGhCommit: No Build Android APK workflow found for commit $CommitSha"
+      }
+    } else {
+      Write-Host "[DEBUG] Find-Run-ByGhCommit: No runs found for commit $CommitSha"
     }
-    return $null
+  }
+  catch {
+    Write-Host "[DEBUG] Find-Run-ByGhCommit: Error searching for commit $CommitSha - $($_.Exception.Message)"
+  }
+  return $null
 }
 
 
@@ -315,37 +342,53 @@ try {
   $monitorStart = Get-Date
   $run = $null
   while ((Get-Date) -lt $deadline) {
-    $runs = Get-Run-ByHeadSha -Owner $owner -Repo $repo -Sha $sha -Token $token -WorkflowName 'Build Android APK'
+    # First try the REST API approach
+    $runs = Get-Run-ByHeadSha -Owner $owner -Repo $repo -Sha $sha -Token $token
     if ($runs -and $runs.Count -gt 0) {
-      $run = $runs | Sort-Object -Property created_at -Descending | Select-Object -First 1
+      # Prefer Build Android APK workflow if present
+      $pref = $runs | Where-Object { $_.name -eq 'Build Android APK' }
+      if ($pref -and $pref.Count -gt 0) { $run = $pref[0] } else { $run = $runs[0] }
       Write-Info ("Found run: run_id=" + $run.id + ", name=" + $run.name + ", status=" + $run.status + " (elapsed " + (Get-ElapsedStr $monitorStart) + ")")
+      # If we picked a non-target workflow that already completed, keep waiting for the target one
+      if ($run.name -ne 'Build Android APK') {
+        $run = $null
+        Start-Sleep -Seconds $PollIntervalSeconds
+        continue
+      }
       break
     }
-    # Fallback with gh CLI (in case REST indexing or filter fails)
+    
+    # Primary fallback: use gh CLI to find the specific commit run
+    $runsGhCommit = Find-Run-ByGhCommit -CommitSha $sha
+    if ($runsGhCommit) {
+      $run = $runsGhCommit
+      Write-Info ("Found run via gh commit: run_id=" + $run.id + ", name=" + $run.name + ", status=" + $run.status + " (elapsed " + (Get-ElapsedStr $monitorStart) + ")")
+      # Enrich run with REST details if possible
+      $restRun = Get-RunById -Owner $owner -Repo $repo -RunId ([long]$run.id) -Token $token
+      if ($restRun) { 
+        $run = $restRun 
+        Write-Info ("Enriched run details from REST API: status=" + $run.status + ", conclusion=" + $run.conclusion)
+      }
+      break
+    }
+    
+    # Secondary fallback: general REST API search
     $runsGh = Find-Run-Fallback -Owner $owner -Repo $repo -Sha $sha
     if ($runsGh -and $runsGh.Count -gt 0) {
       $run = $runsGh[0]
-      Write-Info ("Found run via gh: run_id=" + $run.id + ", status=" + $run.status + " (elapsed " + (Get-ElapsedStr $monitorStart) + ")")
+      Write-Info ("Found run via gh fallback: run_id=" + $run.id + ", status=" + $run.status + " (elapsed " + (Get-ElapsedStr $monitorStart) + ")")
       break
     }
-    # Fallback 3: filter by commit via gh run list
-    $runGhCommit = Find-Run-ByGhCommit -CommitSha $sha
-    if ($runGhCommit) {
-      $run = $runGhCommit
-      Write-Info ("Found run via gh commit: run_id=" + $run.id + ", status=" + $run.status + " (elapsed " + (Get-ElapsedStr $monitorStart) + ")")
-      # Enrich run with REST details
-      $restRun = Get-RunById -Owner $owner -Repo $repo -RunId ([long]$run.id) -Token $token
-      if ($restRun) { $run = $restRun }
-      if ($run -and $run.name -ne 'Build Android APK') { $run = $null } else { break }
-    }
-    # Fallback 2: search by workflow name
+    
+    # Tertiary fallback: search by workflow name
     $runsWf = Find-Run-ByWorkflow -Owner $owner -Repo $repo -Sha $sha
     if ($runsWf -and $runsWf.Count -gt 0) {
       $run = $runsWf[0]
       Write-Info ("Found run via workflow: run_id=" + $run.id + ", status=" + $run.status + " (elapsed " + (Get-ElapsedStr $monitorStart) + ")")
       break
     }
-    Write-Info ("Run for sha " + $sha + " not indexed yet; waiting... (elapsed " + (Get-ElapsedStr $monitorStart) + ")")
+    
+    Write-Info ("Run not indexed yet; waiting... (elapsed " + (Get-ElapsedStr $monitorStart) + ")")
     Start-Sleep -Seconds $PollIntervalSeconds
   }
 
