@@ -5,6 +5,7 @@ param(
   [string]$TagPrefix = 'v',
   [int]$WaitSeconds = 600,
   [int]$PollIntervalSeconds = 10,
+  [string]$UpdateUrl,
   [switch]$SkipPush
 )
 
@@ -466,6 +467,12 @@ try {
       try {
         $aggLogs = (& gh run view $summary.run_id --log 2>$null | Out-String)
         $r2Url = Get-R2Url-FromLogs -LogsText $aggLogs
+      } catch {}
+    }
+    if (-not $r2Url -and $UpdateUrl) {
+      try {
+        $resp = Invoke-RestMethod -Uri $UpdateUrl -Method GET -TimeoutSec 30 -Headers @{ Accept = 'application/json' }
+        if ($resp -and $resp.androidApkUrl) { $r2Url = [string]$resp.androidApkUrl }
       } catch {}
     }
     if ($r2Url) {
