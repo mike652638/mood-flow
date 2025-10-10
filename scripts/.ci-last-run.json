@@ -1,13 +1,13 @@
 ﻿{
     "ok":  true,
-    "tag":  "v1.1.96-ci9",
+    "tag":  "v1.2.3",
     "branch":  "main",
-    "head_sha":  "80e67b34c0cfc90a2668215007cf331c2f18342b",
-    "run_id":  18395966939,
-    "run_number":  79,
+    "head_sha":  "9bf4b5c1b865f31ec8268899203d64673c6db9d8",
+    "run_id":  18400222421,
+    "run_number":  80,
     "status":  "completed",
     "conclusion":  "success",
-    "html_url":  "https://github.com/mike652638/mood-flow/actions/runs/18395966939",
+    "html_url":  "https://github.com/mike652638/mood-flow/actions/runs/18400222421",
     "workflow_name":  "Build Android APK",
     "workflow_path":  ".github/workflows/build-android.yml",
     "jobs":  [
@@ -22,6 +22,6 @@
                      "conclusion":  "success"
                  }
              ],
-    "release_url":  "https://github.com/mike652638/mood-flow/releases/tag/v1.1.96-ci9",
+    "release_url":  "https://github.com/mike652638/mood-flow/releases/tag/v1.2.3",
     "r2_apk_url":  null
 }

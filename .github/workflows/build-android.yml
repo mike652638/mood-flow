@@ -417,6 +417,9 @@ jobs:
             R2_URL="https://${R2_BUCKET}.r2.dev/releases/${BASENAME}"
           fi
           echo "R2_URL=${R2_URL}" >> "$GITHUB_ENV"
+          # Also print the public URL to logs so external monitors can parse it
+          echo "Resolved R2 APK public URL: ${R2_URL}"
+          echo "::notice title=R2 APK URL::${R2_URL}"
 
       - name: Update public/updates.json with APK URL
         if: ${{ env.R2_URL != '' }}
