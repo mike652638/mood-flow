@@ -16,9 +16,28 @@ declare global {
 }
 
 const getRuntime = () => window.__RUNTIME_CONFIG__ || {};
-const BASE_URL = getRuntime().DEEPSEEK_BASE_URL || import.meta.env.VITE_DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
-const API_KEY = getRuntime().DEEPSEEK_API_KEY || import.meta.env.VITE_DEEPSEEK_API_KEY || '';
-const MODEL = getRuntime().DEEPSEEK_MODEL || import.meta.env.VITE_DEEPSEEK_MODEL || 'deepseek-chat';
+
+// 运行时读取配置，避免打包时环境变量缺失导致原生端不可用
+const getBaseUrl = (): string =>
+  getRuntime().DEEPSEEK_BASE_URL || import.meta.env.VITE_DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
+
+const getModel = (): string => getRuntime().DEEPSEEK_MODEL || import.meta.env.VITE_DEEPSEEK_MODEL || 'deepseek-chat';
+
+// 优先使用运行时注入/打包环境变量；在移动端或未注入时，回退到 localStorage
+const getApiKey = (): string => {
+  const injected = getRuntime().DEEPSEEK_API_KEY || import.meta.env.VITE_DEEPSEEK_API_KEY || '';
+  if (injected) return injected;
+  try {
+    // 兼容不同命名键（支持 Vite 前缀）
+    return (
+      localStorage.getItem('VITE_DEEPSEEK_API_KEY') ||
+      localStorage.getItem('DEEPSEEK_API_KEY') ||
+      ''
+    );
+  } catch {
+    return '';
+  }
+};
 
 export interface ChatOptions {
   stream?: boolean;
@@ -40,8 +59,13 @@ export async function deepseekChat(
   messages: ChatMessage[],
   options: ChatOptions = {}
 ): Promise<ChatResult | AsyncGenerator<string>> {
+  const API_KEY = getApiKey();
+  const BASE_URL = getBaseUrl();
+  const MODEL = getModel();
   if (!API_KEY) {
-    throw new Error('DeepSeek API Key 未配置。请在 .env.local 中设置 VITE_DEEPSEEK_API_KEY');
+    throw new Error(
+      'DeepSeek API Key 未配置。请在 .env.* 中设置 VITE_DEEPSEEK_API_KEY，或前往“设置 → 应用设置 → AI 服务配置”保存密钥以在移动端生效'
+    );
   }
 
   const body = {
