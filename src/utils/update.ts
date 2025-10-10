@@ -54,10 +54,29 @@ export async function checkForUpdate(customUrl?: string): Promise<UpdateCheckRes
   const envObj = (import.meta as unknown as { env?: { VITE_APP_UPDATE_URL?: string; VITE_APP_UPDATES_BASE?: string } }).env;
   const envUrl = envObj?.VITE_APP_UPDATE_URL as string | undefined;
   const baseUrl = envObj?.VITE_APP_UPDATES_BASE as string | undefined;
+
+  // 候选源：自定义 > 环境 URL > 环境 BASE > 从本地包推断的远程 BASE > 本地包
   const candidates: string[] = [];
   if (customUrl) candidates.push(customUrl);
   if (envUrl) candidates.push(envUrl);
   if (baseUrl) candidates.push(baseUrl.endsWith('/') ? `${baseUrl}updates.json` : `${baseUrl}/updates.json`);
+
+  // 从本地包内的 /updates.json 推断远程路径（兼容旧版本未注入环境变量的情况）
+  try {
+    const localRes = await fetch('/updates.json', { cache: 'no-store' });
+    if (localRes.ok) {
+      const localInfo = (await localRes.json()) as UpdateInfo;
+      const apk = localInfo?.androidApkUrl || '';
+      const m = apk.match(/^(https?:\/\/[^\s"<>]+)\/releases\//);
+      if (m && m[1]) {
+        const base = `${m[1]}/releases/updates.json`;
+        candidates.push(base);
+      }
+    }
+  } catch (err) {
+    // 忽略本地包读取错误
+  }
+
   // 本地包内作为最后兜底
   candidates.push('/updates.json');
 

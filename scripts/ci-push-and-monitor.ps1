@@ -641,9 +641,26 @@ try {
             Write-Ok 'updates.json androidApkUrl matches detected R2 URL'
           }
           else {
-            Write-Warn 'updates.json androidApkUrl does NOT match detected R2 URL'
-            Write-Info ('updates.json: ' + $apkInJson)
-            Write-Info ('detected:    ' + $summary.r2_apk_url)
+            # Be tolerant to domain/base differences: compare basename and releases path segment
+            $base1 = [System.IO.Path]::GetFileName($apkInJson)
+            $base2 = [System.IO.Path]::GetFileName($summary.r2_apk_url)
+            $seg1 = ''
+            $seg2 = ''
+            $m1 = [regex]::Match($apkInJson, '/releases/([^?\s"<>]+\.apk)')
+            if ($m1.Success) { $seg1 = $m1.Groups[1].Value }
+            $m2 = [regex]::Match($summary.r2_apk_url, '/releases/([^?\s"<>]+\.apk)')
+            if ($m2.Success) { $seg2 = $m2.Groups[1].Value }
+
+            if (($base1 -and $base2 -and $base1 -eq $base2) -or ($seg1 -and $seg2 -and $seg1 -eq $seg2)) {
+              Write-Ok 'updates.json APK path matches detected R2 URL (domain/base normalized)'
+              Write-Info ('updates.json: ' + $apkInJson)
+              Write-Info ('detected:    ' + $summary.r2_apk_url)
+            }
+            else {
+              Write-Warn 'updates.json androidApkUrl does NOT match detected R2 URL'
+              Write-Info ('updates.json: ' + $apkInJson)
+              Write-Info ('detected:    ' + $summary.r2_apk_url)
+            }
           }
         }
         else {
