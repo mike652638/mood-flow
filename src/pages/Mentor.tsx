@@ -212,7 +212,7 @@ const BreathingGuide: React.FC<{
 
 // 正念冥想组件
 const MindfulnessMeditation: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const [phase, setPhase] = useState<'prepare' | 'breathing' | 'body' | 'thoughts' | 'complete'>('prepare');
+  const [_phase, setPhase] = useState<'prepare' | 'breathing' | 'body' | 'thoughts' | 'complete'>('prepare');
   const [timeLeft, setTimeLeft] = useState(600); // 10分钟
   const [isActive, setIsActive] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
@@ -693,7 +693,7 @@ const Grounding54321: React.FC<{
 
   useEffect(() => () => timerRef.current && window.clearInterval(timerRef.current), []);
 
-  const buildText = () =>
+  const _buildText = () =>
     [
       '【感官回归 复盘】',
       `看到的 5 样东西：${five || '（未填写）'}`,
@@ -793,8 +793,8 @@ const Mentor: React.FC = () => {
   const [input, setInput] = useState('');
   // 统一改用 Toast 提示，无需额外输入提示状态
   const [abortCtrl, setAbortCtrl] = useState<AbortController | null>(null);
-  const [progress, setProgress] = useState(0);
-  const [sendStartAt, setSendStartAt] = useState<number | null>(null);
+  const [_progress, setProgress] = useState(0);
+  const [_sendStartAt, setSendStartAt] = useState<number | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
   const [lastPrompt, setLastPrompt] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -847,7 +847,7 @@ const Mentor: React.FC = () => {
   });
   const toggleExercise = (key: ExerciseKey) => setExerciseOpen(prev => ({ ...prev, [key]: !prev[key] }));
   const markInProgress = (key: ExerciseKey) => setExerciseStatus(prev => ({ ...prev, [key]: 'in_progress' }));
-  const markCompleted = (key: ExerciseKey) => setExerciseStatus(prev => ({ ...prev, [key]: 'completed' }));
+  const _markCompleted = (key: ExerciseKey) => setExerciseStatus(prev => ({ ...prev, [key]: 'completed' }));
   const markIdle = (key: ExerciseKey) => setExerciseStatus(prev => ({ ...prev, [key]: 'idle' }));
 
   const StatusBadge: React.FC<{ status: ExerciseStatus }> = ({ status }) => {
@@ -898,7 +898,8 @@ const Mentor: React.FC = () => {
       const isAt = el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
       setAtBottom(isAt);
     };
-    el.addEventListener('scroll', handler, { passive: true } as any);
+    const opts: AddEventListenerOptions = { passive: true };
+    el.addEventListener('scroll', handler, opts);
     handler();
     return () => el.removeEventListener('scroll', handler);
   }, [scrollRef]);

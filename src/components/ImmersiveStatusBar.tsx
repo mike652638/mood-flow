@@ -231,12 +231,13 @@ const ImmersiveStatusBar: React.FC<ImmersiveStatusBarProps> = ({
     };
 
     window.addEventListener('resize', resizeHandler);
-    window.addEventListener('orientationchange', resizeHandler as any);
+    const orientationHandler: EventListener = () => resizeHandler();
+    window.addEventListener('orientationchange', orientationHandler);
     const timer = setTimeout(resizeHandler, 300);
     return () => {
       try {
         window.removeEventListener('resize', resizeHandler);
-        window.removeEventListener('orientationchange', resizeHandler as any);
+        window.removeEventListener('orientationchange', orientationHandler);
         clearTimeout(timer);
       } catch (error) {
         console.error('Failed to remove event listeners:', error);
