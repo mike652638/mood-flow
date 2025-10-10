@@ -4,7 +4,8 @@ param(
   [string]$Tag,
   [string]$TagPrefix = 'v',
   [int]$WaitSeconds = 600,
-  [int]$PollIntervalSeconds = 10
+  [int]$PollIntervalSeconds = 10,
+  [switch]$SkipPush
 )
 
 $ErrorActionPreference = 'Stop'
@@ -272,38 +273,41 @@ try {
   Ensure-RepoRoot
   $br = Get-Branch
   Write-Info ("Target branch: " + $br)
+  if (-not $SkipPush) {
+    if (Has-Changes) {
+      Write-Info 'Uncommitted changes detected, preparing commit'
+      & git add -A
+      $msg = if ($CommitMessage) { $CommitMessage } else { 'chore(ci): trigger Android CI run' }
+      & git commit -m "$msg"
+      Write-Ok 'Commit done'
+    }
+    else {
+      Write-Info 'No changes to commit, skipping'
+    }
 
-  if (Has-Changes) {
-    Write-Info 'Uncommitted changes detected, preparing commit'
-    & git add -A
-    $msg = if ($CommitMessage) { $CommitMessage } else { 'chore(ci): trigger Android CI run' }
-    & git commit -m "$msg"
-    Write-Ok 'Commit done'
+    Write-Info 'Pushing branch to origin'
+    & git push origin $br
+    Write-Ok 'Branch push done'
   }
-  else {
-    Write-Info 'No changes to commit, skipping'
-  }
-
-  Write-Info 'Pushing branch to origin'
-  & git push origin $br
-  Write-Ok 'Branch push done'
 
   $tagName = if ($Tag) { $Tag } else { Auto-Tag -TagPrefix $TagPrefix }
   Write-Info ("Using tag: " + $tagName)
 
-  $exists = (& git tag --list $tagName)
-  if ($exists) {
-    Write-Warn ("Tag already exists; updating to current HEAD: " + $tagName)
-    & git tag -f $tagName
-  }
-  else {
-    $tagMsg = if ($CommitMessage) { $CommitMessage } else { "CI trigger $tagName" }
-    & git tag -a $tagName -m $tagMsg
-  }
+  if (-not $SkipPush) {
+    $exists = (& git tag --list $tagName)
+    if ($exists) {
+      Write-Warn ("Tag already exists; updating to current HEAD: " + $tagName)
+      & git tag -f $tagName
+    }
+    else {
+      $tagMsg = if ($CommitMessage) { $CommitMessage } else { "CI trigger $tagName" }
+      & git tag -a $tagName -m $tagMsg
+    }
 
-  Write-Info 'Pushing tag to origin'
-  & git push origin $tagName --force
-  Write-Ok 'Tag push done (CI should be triggered)'
+    Write-Info 'Pushing tag to origin'
+    & git push origin $tagName --force
+    Write-Ok 'Tag push done (CI should be triggered)'
+  }
 
   $sha = (& git rev-parse "$tagName^{commit}").Trim()
   Write-Info ("Tag commit: " + $sha)
