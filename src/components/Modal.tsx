@@ -99,8 +99,7 @@ const Modal: React.FC<ModalProps> = ({ title, onClose, footer, children, classNa
         {/* 固定底部按钮区域 */}
         {footer && (
           <div
-            className='flex-shrink-0 px-6 sm:px-8 py-4 border-t border-white/30 dark:border-theme-gray-700/60 bg-white/90 dark:bg-theme-gray-900/90 rounded-b-3xl'
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}
+            className='flex-shrink-0 px-6 sm:px-8 py-4 border-t border-white/30 dark:border-theme-gray-700/60 bg-white/90 dark:bg-theme-gray-900/90 rounded-b-3xl pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]'
           >
             <div className={`flex flex-row flex-wrap justify-center items-center gap-3 sm:gap-4 ${footerClassName || ''}`}>
               {footer}

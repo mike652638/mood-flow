@@ -3,9 +3,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'sonner';
 import { supabase } from './lib/supabase';
 import { initializeApp, setImmersiveStatusBar, isNative } from './utils/capacitor';
-import { checkForUpdate, getAutoCheckEnabled, openUpdateLink } from './utils/update';
+import { checkForUpdate, getAutoCheckEnabled } from './utils/update';
 import { preDownloadApk, installDownloadedApk } from './utils/nativeUpdate';
 import Modal from './components/Modal';
+import UpdateFlow from './components/UpdateFlow';
 import { useAuthStore } from './store';
 import Layout from './components/Layout';
 import ImmersiveStatusBar from './components/ImmersiveStatusBar';
@@ -267,33 +268,33 @@ function App() {
               <p className='text-sm sm:text-base text-gray-700 dark:text-gray-200'>
                 为了保证功能与安全性，请立即更新到最新版本。
               </p>
-              <div className='flex justify-center pt-2'>
-                <button
-                  onClick={() => mandatoryUpdate?.url && openUpdateLink(mandatoryUpdate.url)}
-                  className='px-4 py-2 rounded-lg border bg-purple-600 text-white hover:bg-purple-700'>
-                  立即更新
-                </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      const mod: typeof import('@capacitor/app') = await import('@capacitor/app');
-                      const AppPlugin = mod.App;
-                      if (AppPlugin?.exitApp) {
-                        await AppPlugin.exitApp();
-                        return;
+              <div className='pt-2'>
+                {mandatoryUpdate.url && (
+                  <UpdateFlow url={mandatoryUpdate.url} onInstalled={() => setMandatoryUpdate(null)} />
+                )}
+                <div className='mt-3 flex justify-center'>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const mod: typeof import('@capacitor/app') = await import('@capacitor/app');
+                        const AppPlugin = mod.App;
+                        if (AppPlugin?.exitApp) {
+                          await AppPlugin.exitApp();
+                          return;
+                        }
+                      } catch (err) {
+                        console.warn('[PROD] Exit app failed:', err);
                       }
-                    } catch (err) {
-                      console.warn('[PROD] Exit app failed:', err);
-                    }
-                    try {
-                      window.close();
-                    } catch (err) {
-                      console.warn('[PROD] Close window failed:', err);
-                    }
-                  }}
-                  className='ml-3 px-4 py-2 rounded-lg border bg-gray-100 dark:bg-theme-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-theme-gray-700'>
-                  退出应用
-                </button>
+                      try {
+                        window.close();
+                      } catch (err) {
+                        console.warn('[PROD] Close window failed:', err);
+                      }
+                    }}
+                    className='px-4 py-2 rounded-lg border bg-gray-100 dark:bg-theme-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-theme-gray-700'>
+                    退出应用
+                  </button>
+                </div>
               </div>
             </div>
           </Modal>

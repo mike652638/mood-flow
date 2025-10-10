@@ -563,10 +563,10 @@ try {
           }
           else {
             # Generic scan fallback
-            $matches = [regex]::Matches([string]$rel.body, '(https?://[^\s\)"<>]+\.apk)')
-            if ($matches.Count -gt 0) {
+            $regexMatches = [regex]::Matches([string]$rel.body, '(https?://[^\s\)"<>]+\.apk)')
+            if ($regexMatches.Count -gt 0) {
               $urls = @()
-              foreach ($m in $matches) { $urls += $m.Groups[1].Value }
+              foreach ($m in $regexMatches) { $urls += $m.Groups[1].Value }
               $prefer = $urls | Where-Object { $_ -match '\.r2\.cloudflarestorage\.com' -or $_ -match '\.r2\.dev' }
               if ($prefer -and $prefer.Count -gt 0) { $bodyR2 = ($prefer | Select-Object -First 1) }
               else { $bodyR2 = ($urls | Select-Object -First 1) }

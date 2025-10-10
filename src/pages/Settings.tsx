@@ -32,9 +32,9 @@ import {
   checkForUpdate,
   UpdateCheckResult,
   getAutoCheckEnabled,
-  setAutoCheckEnabled,
-  openUpdateLink
+  setAutoCheckEnabled
 } from '../utils/update';
+import UpdateFlow from '../components/UpdateFlow';
 
 interface UserProfile {
   name: string;
@@ -1128,11 +1128,7 @@ const Settings = ({ immersiveMode = false, onImmersiveModeChange, onThemeChange 
                   </button>
                 )}
                 {updateResult.info.androidApkUrl && (
-                  <button
-                    onClick={() => openUpdateLink(updateResult.info!.androidApkUrl!)}
-                    className='px-4 py-2 rounded-lg border bg-purple-600 text-white hover:bg-purple-700'>
-                    前往更新
-                  </button>
+                  <UpdateFlow url={updateResult.info.androidApkUrl} onInstalled={() => setShowUpdateModal(false)} />
                 )}
               </div>
             </div>

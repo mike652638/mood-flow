@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.database.Cursor;
 import android.os.Environment;
 import android.provider.Settings;
 import androidx.core.content.FileProvider;
@@ -43,6 +44,41 @@ public class ApkUpdater extends Plugin {
 
             long id = dm.enqueue(req);
 
+            // 周期性查询下载进度，并通过事件通知到前端
+            new Thread(() -> {
+                boolean running = true;
+                DownloadManager.Query query = new DownloadManager.Query();
+                query.setFilterById(id);
+                while (running) {
+                    try {
+                        Cursor cursor = dm.query(query);
+                        if (cursor != null && cursor.moveToFirst()) {
+                            int status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+                            long downloaded = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+                            long total = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+
+                            JSObject ev = new JSObject();
+                            ev.put("id", id);
+                            ev.put("downloaded", downloaded);
+                            ev.put("total", total);
+                            notifyListeners("downloadProgress", ev);
+
+                            if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                                running = false;
+                            } else if (status == DownloadManager.STATUS_FAILED) {
+                                running = false;
+                                JSObject err = new JSObject();
+                                err.put("id", id);
+                                notifyListeners("downloadFailed", err);
+                            }
+                        }
+                        if (cursor != null) cursor.close();
+                    } catch (Exception ignored) {}
+
+                    try { Thread.sleep(500); } catch (InterruptedException ignored) {}
+                }
+            }).start();
+
             BroadcastReceiver receiver = new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context c, Intent intent) {
@@ -55,12 +91,21 @@ public class ApkUpdater extends Plugin {
                         JSObject ret = new JSObject();
                         ret.put("ok", true);
                         ret.put("path", file.getAbsolutePath());
+                        // 事件通知：下载完成
+                        JSObject ev = new JSObject();
+                        ev.put("id", id);
+                        ev.put("path", file.getAbsolutePath());
+                        notifyListeners("downloadCompleted", ev);
                         call.resolve(ret);
                     }
                 }
             };
             context.registerReceiver(receiver, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
         } catch (Exception e) {
+            JSObject err = new JSObject();
+            err.put("ok", false);
+            err.put("error", e.getMessage());
+            notifyListeners("downloadFailed", err);
             call.reject("Download error: " + e.getMessage());
         }
     }

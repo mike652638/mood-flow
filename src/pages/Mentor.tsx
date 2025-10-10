@@ -1265,7 +1265,7 @@ const Mentor: React.FC = () => {
                       <StatusBadge status={exerciseStatus.reframe} />
                       <button
                         onClick={() => toggleExercise('reframe')}
-                        aria-expanded={exerciseOpen.reframe ? 'true' : 'false'}
+                        aria-expanded={exerciseOpen.reframe}
                         className='text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors'>
                         {exerciseOpen.reframe ? '收起' : '展开'}
                       </button>

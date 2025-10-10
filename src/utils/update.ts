@@ -99,6 +99,20 @@ export async function checkForUpdate(customUrl?: string): Promise<UpdateCheckRes
       console.warn('Update check failed on source:', url, err);
     }
   }
+
+  // 兜底：若远程源不可读（如 CORS），尝试 GitHub Releases 获取最新发布信息
+  try {
+    const gh = await fetchGithubReleaseFallback();
+    if (gh && compareVersions(gh.latestVersion, current) > 0) {
+      return { currentVersion: current, info: gh, hasUpdate: true, sourceUrl: gh.androidApkUrl || 'github:releases/latest' };
+    }
+    if (gh && (!bestInfo || compareVersions(gh.latestVersion, bestInfo.latestVersion) > 0)) {
+      bestInfo = gh;
+      bestSource = 'github:releases/latest';
+    }
+  } catch {
+    // 忽略 GitHub 兜底错误
+  }
   if (bestInfo) {
     const hasUpdate = compareVersions(bestInfo.latestVersion, current) > 0;
     return { currentVersion: current, info: bestInfo, hasUpdate, sourceUrl: bestSource };
@@ -153,6 +167,44 @@ export async function openUpdateLink(url: string): Promise<void> {
     window.open(url, '_blank');
   } catch (err) {
     console.warn('Window open failed:', err);
+  }
+}
+// GitHub Releases 兜底：解析最新发布版本与 APK 下载地址（公开仓库，无需鉴权）
+async function fetchGithubReleaseFallback(): Promise<UpdateInfo | undefined> {
+  try {
+    const envObj = (import.meta as unknown as { env?: { VITE_GITHUB_REPO?: string } }).env;
+    const repo = (envObj?.VITE_GITHUB_REPO as string | undefined) || 'mike652638/mood-flow';
+    const url = `https://api.github.com/repos/${repo}/releases/latest`;
+    const res = await fetch(url, { cache: 'no-store', headers: { Accept: 'application/vnd.github+json' } });
+    if (!res.ok) return undefined;
+    const j = await res.json();
+    const tag = (j?.tag_name || '').trim();
+    const ver = tag.replace(/^v/, '');
+    if (!ver) return undefined;
+    let apkUrl: string | undefined;
+    const body: string = (j?.body || '') as string;
+    const m = body.match(/R2_APK_URL:\s*(https?:\/\/[^\s]+)/);
+    if (m && m[1]) apkUrl = m[1];
+    if (!apkUrl && Array.isArray(j?.assets)) {
+      const asset = j.assets.find((a: unknown) => {
+        return typeof a === 'object' && a !== null && 
+               'name' in a && typeof (a as { name?: unknown }).name === 'string' && 
+               (a as { name: string }).name.endsWith('app-release.apk');
+      });
+      if (asset && typeof asset === 'object' && asset !== null && 'browser_download_url' in asset) {
+        apkUrl = (asset as { browser_download_url?: string }).browser_download_url || '';
+      }
+    }
+    const info: UpdateInfo = {
+      latestVersion: ver,
+      androidApkUrl: apkUrl,
+      releaseNotes: typeof body === 'string' ? body : undefined,
+      mandatory: false,
+      publishedAt: j?.published_at || undefined
+    };
+    return info;
+  } catch {
+    return undefined;
   }
 }
 import { Capacitor } from '@capacitor/core';
