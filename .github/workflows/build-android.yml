@@ -461,19 +461,6 @@ jobs:
           DEST="s3://${R2_BUCKET}/releases/updates.json"
           aws --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" s3 cp "$SRC" "$DEST" --content-type application/json --acl public-read || true
 
-      - name: Append R2 APK URL marker to release notes
-        if: ${{ env.R2_URL != '' }}
-        shell: bash
-        run: |
-          set -e
-          BODY="dist/meta/release-notes.md"
-          if [ -f "$BODY" ]; then
-            echo "R2_APK_URL: ${R2_URL}" >> "$BODY"
-            echo "Appended R2_APK_URL marker to release notes"
-          else
-            echo "Release notes body missing at $BODY; skipping marker append" >&2
-          fi
-
       - name: Commit updates.json back to repo (branch runs only)
         if: ${{ env.R2_URL != '' && github.event_name != 'pull_request' && startsWith(github.ref, 'refs/heads/') }}
         shell: bash
@@ -723,6 +710,34 @@ jobs:
         with:
           name: meta-sbom-and-manifest
           path: dist/meta
+      - name: Append R2 APK URL marker to release notes (pre-publish)
+        shell: bash
+        run: |
+          set -e
+          APK_FILE=$(ls -1 dist/apk/mood-flow-*-store-*.apk | tail -n1 || true)
+          if [ -z "$APK_FILE" ]; then
+            APK_FILE=$(ls -1 dist/apk/mood-flow-*-release-*.apk | tail -n1 || true)
+          fi
+          if [ -z "$APK_FILE" ]; then
+            echo "No APK file found to append marker" >&2
+            exit 0
+          fi
+          BASENAME=$(basename "$APK_FILE")
+          if [ -n "${R2_PUBLIC_BASE}" ]; then
+            R2_URL="${R2_PUBLIC_BASE}/releases/${BASENAME}"
+          elif [ -n "${R2_BUCKET}" ]; then
+            R2_URL="https://${R2_BUCKET}.r2.dev/releases/${BASENAME}"
+          else
+            R2_URL=""
+          fi
+          BODY="dist/meta/release-notes.md"
+          if [ -f "$BODY" ] && [ -n "$R2_URL" ]; then
+            echo "R2_APK_URL: ${R2_URL}" >> "$BODY"
+            echo "::notice title=R2 APK URL::${R2_URL}"
+            echo "Appended R2_APK_URL marker to release notes (publish-release)"
+          else
+            echo "Release notes missing or R2_URL empty; skip append" >&2
+          fi
       - name: Publish GitHub Release with assets
         uses: softprops/action-gh-release@v1
         with:
