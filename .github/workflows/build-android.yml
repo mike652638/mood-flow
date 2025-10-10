@@ -689,6 +689,8 @@ jobs:
     env:
       R2_BUCKET: ${{ secrets.R2_BUCKET }}
       R2_PUBLIC_BASE: ${{ secrets.R2_PUBLIC_BASE }}
+    outputs:
+      r2_apk_url: ${{ steps.append_r2_marker.outputs.r2_apk_url }}
     steps:
       - name: Download APK artifacts
         uses: actions/download-artifact@v4
@@ -711,6 +713,7 @@ jobs:
           name: meta-sbom-and-manifest
           path: dist/meta
       - name: Append R2 APK URL marker to release notes (pre-publish)
+        id: append_r2_marker
         shell: bash
         run: |
           set -e
@@ -734,6 +737,10 @@ jobs:
           if [ -f "$BODY" ] && [ -n "$R2_URL" ]; then
             echo "R2_APK_URL: ${R2_URL}" >> "$BODY"
             echo "::notice title=R2 APK URL::${R2_URL}"
+            # Expose as job output for downstream consumers/monitors
+            echo "r2_apk_url=${R2_URL}" >> "$GITHUB_OUTPUT"
+            # Also emit a distinct notice marker for log-based output parsing
+            echo "::notice title=R2 APK URL OUTPUT::${R2_URL}"
             echo "Appended R2_APK_URL marker to release notes (publish-release)"
           else
             echo "Release notes missing or R2_URL empty; skip append" >&2

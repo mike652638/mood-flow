@@ -317,6 +317,8 @@ function Get-R2Url-FromLogs {
   $patterns = @(
     'Running:\s+node\s+scripts/update-updates-json\.cjs\s+--apk-url\s+(https?://[^\s"<>]+\.apk)',
     '::notice\s+title=R2\s+APK\s+URL::(https?://[^\s"<>]+\.apk)',
+    '::notice\s+title=R2\s+APK\s+URL\s+OUTPUT::(https?://[^\s"<>]+\.apk)',
+    'R2_APK_URL_OUTPUT:\s*(https?://[^\s"<>]+\.apk)',
     'Resolved\s+R2\s+APK\s+public\s+URL:\s+(https?://[^\s"<>]+\.apk)',
     'androidApkUrl\s*[:=]\s*(https?://[^\s"<>]+\.apk)',
     '(https?://[^\s"<>]+/releases/[^\s"<>]+\.apk)',
@@ -609,14 +611,28 @@ try {
       if ($UpdateUrl) {
         $updates = $null
         if ($UpdateUrl -match '^(https?://)') {
-          $updates = Invoke-RestMethod -Uri $UpdateUrl -Method GET -TimeoutSec 30 -Headers @{ Accept = 'application/json' }
+          try {
+            $resp = Invoke-RestMethod -Uri $UpdateUrl -Method GET -TimeoutSec 30 -Headers @{ Accept = 'application/json' }
+            if ($resp -and ($resp.PSObject.Properties.Name -contains 'androidApkUrl')) { $updates = $resp }
+            else { Write-Warn 'updates.json remote content missing androidApkUrl or invalid object' }
+          } catch { Write-Warn ('Failed to fetch/parse remote updates.json: ' + $_.Exception.Message) }
         }
         else {
           $path = $UpdateUrl
           if (-not (Test-Path $path) -and $PSScriptRoot) {
             try { $path = Join-Path (Split-Path -Parent $PSScriptRoot) $UpdateUrl } catch {}
           }
-          if (Test-Path $path) { $updates = (Get-Content $path -Raw) | ConvertFrom-Json }
+          if (Test-Path $path) {
+            try {
+              $raw = Get-Content $path -Raw -ErrorAction Stop
+              $obj = $raw | ConvertFrom-Json -ErrorAction Stop
+              if ($obj -and ($obj.PSObject.Properties.Name -contains 'androidApkUrl')) { $updates = $obj }
+              else { Write-Warn 'updates.json local content missing androidApkUrl or invalid object' }
+            } catch { Write-Warn ('Failed to read/parse local updates.json: ' + $_.Exception.Message) }
+          }
+          else {
+            Write-Warn ('Local updates.json not found at ' + $path)
+          }
         }
         if ($updates -and $updates.androidApkUrl) {
           $apkInJson = [string]$updates.androidApkUrl
