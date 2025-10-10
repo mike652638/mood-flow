@@ -21,6 +21,21 @@ if (bullets.length === 0) {
   // fallback to first non-empty lines after title
   bullets = lines.filter(l => l.trim() && !/^#/.test(l)).slice(0, 3).map(l => l.trim());
 }
-bullets = bullets.slice(0, 5).map(s => s.replace(/[`"']/g, '').replace(/\s+/g, ' '));
+// Sanitize text to avoid introducing illegal JSON characters or quotes
+function sanitize(s) {
+  try {
+    // Normalize Unicode to NFC to reduce composition issues
+    s = s.normalize('NFC');
+  } catch {}
+  // Remove quotes/backticks and smart quotes
+  s = s.replace(/[`"'“”‘’]/g, '');
+  // Strip control characters (C0/C1) except common whitespace
+  s = s.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+  // Collapse whitespace
+  s = s.replace(/\s+/g, ' ').trim();
+  return s;
+}
+
+bullets = bullets.slice(0, 5).map(sanitize);
 const summary = bullets.length ? bullets.join(' • ') : '修复与优化若干问题';
-process.stdout.write(summary);
+process.stdout.write(sanitize(summary));

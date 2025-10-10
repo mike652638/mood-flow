@@ -22,8 +22,10 @@ function todayISO() {
 
 function updateJson(opts) {
   const file = path.join(process.cwd(), 'public', 'updates.json');
+  // Read as UTF-8 and strip BOM defensively, then parse
   const raw = fs.readFileSync(file, 'utf8');
-  const json = JSON.parse(raw);
+  const rawNoBom = raw.replace(/^\uFEFF/, '');
+  const json = JSON.parse(rawNoBom);
 
   if (opts.apkUrl) json.androidApkUrl = opts.apkUrl;
   if (opts.version) json.latestVersion = opts.version;

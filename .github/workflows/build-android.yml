@@ -443,6 +443,13 @@ jobs:
           sudo apt-get install -y jq >/dev/null 2>&1 || true
           jq -e 'type=="object" and has("latestVersion") and (.latestVersion|type=="string" and test("^[0-9]+\\.[0-9]+\\.[0-9]+$")) and has("androidApkUrl") and (.androidApkUrl|type=="string" and length>0) and has("publishedAt") and (.publishedAt|type=="string") and has("mandatory") and (.mandatory|type=="boolean")' public/updates.json >/dev/null
           echo "updates.json is valid and contains required fields"
+      - name: Validate updates.json structure (Node)
+        if: ${{ env.R2_URL != '' }}
+        shell: bash
+        run: |
+          set -e
+          echo "Node parsing public/updates.json"
+          node -e 'const fs=require("fs");const p="public/updates.json";let s=fs.readFileSync(p,"utf8").replace(/^\uFEFF/,"");let j=JSON.parse(s);const has=k=>Object.prototype.hasOwnProperty.call(j,k);if(!has("latestVersion")||typeof j.latestVersion!=="string")throw new Error("latestVersion invalid");if(!has("androidApkUrl")||typeof j.androidApkUrl!=="string"||!j.androidApkUrl.length)throw new Error("androidApkUrl invalid");if(!has("publishedAt")||typeof j.publishedAt!=="string")throw new Error("publishedAt invalid");if(!has("mandatory")||typeof j.mandatory!=="boolean")throw new Error("mandatory invalid");if(has("releaseNotes")&&typeof j.releaseNotes!=="string")throw new Error("releaseNotes invalid type");process.stdout.write("Node JSON parse ok\\n");'
 
       - name: Upload updates.json to Cloudflare R2
         if: ${{ env.R2_ACCOUNT_ID != '' && env.R2_ACCESS_KEY_ID != '' && env.R2_SECRET_ACCESS_KEY != '' && env.R2_BUCKET != '' }}

@@ -624,7 +624,8 @@ try {
           }
           if (Test-Path $path) {
             try {
-              $raw = Get-Content $path -Raw -ErrorAction Stop
+              # Read as UTF-8 explicitly to avoid codepage-related garbling of non-ASCII characters
+              $raw = Get-Content $path -Raw -Encoding UTF8 -ErrorAction Stop
               $obj = $raw | ConvertFrom-Json -ErrorAction Stop
               if ($obj -and ($obj.PSObject.Properties.Name -contains 'androidApkUrl')) { $updates = $obj }
               else { Write-Warn 'updates.json local content missing androidApkUrl or invalid object' }
