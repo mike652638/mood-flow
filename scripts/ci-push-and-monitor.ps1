@@ -279,6 +279,12 @@ function Get-R2Url-FromLogs {
   $pattern = 'Running:\s+node\s+scripts/update-updates-json\.cjs\s+--apk-url\s+(https?://[^\s]+\.apk)'
   $m = [regex]::Match($LogsText, $pattern)
   if ($m.Success) { return $m.Groups[1].Value }
+  # Notice annotation printed by workflow: ::notice title=R2 APK URL::<url>
+  $mNotice = [regex]::Match($LogsText, '::notice\s+title=R2\s+APK\s+URL::(https?://[^\s]+\.apk)')
+  if ($mNotice.Success) { return $mNotice.Groups[1].Value }
+  # Explicit echo: Resolved R2 APK public URL: <url>
+  $mEcho = [regex]::Match($LogsText, 'Resolved\s+R2\s+APK\s+public\s+URL:\s+(https?://[^\s]+\.apk)')
+  if ($mEcho.Success) { return $mEcho.Groups[1].Value }
   # Fallback: look for mood-flow-*.apk public URL printed elsewhere
   $m2 = [regex]::Match($LogsText, '(https?://[^\s]+/releases/mood-flow-[^\s]+\.apk)')
   if ($m2.Success) { return $m2.Groups[1].Value }
