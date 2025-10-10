@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { MessageSquare, ShieldAlert, Save, Send, Fingerprint } from 'lucide-react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { MessageSquare, ShieldAlert, Send, Fingerprint } from 'lucide-react';
 import { toast } from 'sonner';
 import Card from '../components/Card';
 import Container from '../components/Container';
 import Header from '../components/Header';
 import Modal from '../components/Modal';
+import Button from '../components/Button';
 import { useImmersiveMode } from '../hooks/useImmersiveMode';
-import { useMoodStats, useMoodTrend, useTodayRecords, useMoodStore } from '../store';
-import type { MoodType, MoodRecord } from '../types';
+import { useMoodStats, useMoodTrend, useTodayRecords } from '../store';
+
 import { deepseekChat, deepseekChatWithRetry, buildMentorSystemPrompt, buildReframePrompt } from '../lib/llm';
 import { useNetworkStatus } from '../hooks/useMobile';
 import { cn } from '../utils/cn';
@@ -38,7 +40,102 @@ interface ChatBubble {
   role: 'user' | 'assistant';
   content: string;
   streaming?: boolean;
+  streamStartAt?: number;
 }
+
+const MessageItem = React.memo(
+  ({
+    m,
+    hasConversation,
+    onStartBreath,
+    onStartReframe,
+    onStartGrounding
+  }: {
+    m: ChatBubble;
+    hasConversation: boolean;
+    onStartBreath: (seconds: number, pace: { inhale: number; hold: number; exhale: number }) => void;
+    onStartReframe: () => void;
+    onStartGrounding: (initial: number) => void;
+  }) => {
+    return (
+      <div
+        className={
+          m.role === 'assistant'
+            ? `${
+                hasConversation
+                  ? 'max-w-full sm:max-w-[90%] md:max-w-[85%] lg:max-w-[80%] xl:max-w-[75%] 2xl:max-w-[70%]'
+                  : 'max-w-full sm:max-w-[96%] md:max-w-[94%] lg:max-w-[92%] xl:max-w-[90%] 2xl:max-w-[88%]'
+              } bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-theme-gray-700/60 ring-1 ring-white/25 dark:ring-theme-gray-700/60 rounded-2xl p-3 shadow-sm dark:shadow-none`
+            : `ml-auto ${
+                hasConversation
+                  ? 'max-w-full sm:max-w-[90%] md:max-w-[85%] lg:max-w-[80%] xl:max-w-[75%] 2xl:max-w-[70%]'
+                  : 'max-w-full sm:max-w-[96%] md:max-w-[94%] lg:max-w-[92%] xl:max-w-[90%] 2xl:max-w-[88%]'
+              } bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-theme-gray-700/60 ring-1 ring-white/25 dark:ring-theme-gray-700/60 rounded-2xl p-3 shadow-sm dark:shadow-none`
+        }>
+        <div className='text-sm sm:text-base lg:text-lg text-gray-800 dark:text-gray-200'>
+          {m.content.split(/\n\n+/).map((seg, i) => (
+            <p key={i} className='mb-2 whitespace-pre-wrap leading-relaxed xl:leading-loose'>
+              {seg}
+            </p>
+          ))}
+        </div>
+        {m.streaming && (
+          <div className='mt-2 text-xs sm:text-sm text-gray-400 dark:text-gray-500'>
+            正在生成...{' '}
+            {(() => {
+              const target = 800;
+              const start = m.streamStartAt ?? Date.now();
+              const elapsedSec = Math.max(1, (Date.now() - start) / 1000);
+              const rate = Math.max(8, m.content.length / elapsedSec);
+              const remainingChars = Math.max(0, target - m.content.length);
+              const estSec = Math.round(remainingChars / rate);
+              const mm = Math.floor(estSec / 60);
+              const ss = estSec % 60;
+              return `预计剩余 ${mm > 0 ? `${mm}分${ss}秒` : `${ss}秒`}`;
+            })()}
+          </div>
+        )}
+        {m.streaming && (
+          <div
+            className='mt-2 h-1.5 sm:h-2 w-20 sm:w-24 rounded-full bg-gray-200 dark:bg-theme-gray-700 animate-pulse motion-reduce:animate-none'
+            aria-hidden='true'
+            aria-busy='true'
+          />
+        )}
+        {m.role === 'assistant' && (
+          <div className='mt-3 flex flex-wrap gap-2'>
+            <button
+              onClick={() => onStartBreath(180, { inhale: 4, hold: 4, exhale: 6 })}
+              className='h-8 sm:h-9 px-2 py-1 rounded-lg text-sm bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-800/40 text-blue-700 dark:text-blue-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-700 active:scale-95'>
+              呼吸练习 · 3分钟
+            </button>
+            <button
+              onClick={() => onStartBreath(300, { inhale: 5, hold: 5, exhale: 7 })}
+              className='h-8 sm:h-9 px-2 py-1 rounded-lg text-sm bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-800/40 text-blue-700 dark:text-blue-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-700 active:scale-95'>
+              呼吸练习 · 5分钟（慢）
+            </button>
+            <button
+              onClick={onStartReframe}
+              className='h-8 sm:h-9 px-2 py-1 rounded-lg text-sm bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-800/40 text-purple-700 dark:text-purple-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-700 active:scale-95'>
+              认知重构练习
+            </button>
+            <button
+              onClick={() => onStartGrounding(15)}
+              className='h-8 sm:h-9 px-2 py-1 rounded-lg text-sm bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 dark:hover:bg-emerald-800/40 text-emerald-700 dark:text-emerald-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-700 active:scale-95'>
+              锚定练习（每步15秒）
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  },
+  (prev, next) =>
+    prev.hasConversation === next.hasConversation &&
+    prev.m.id === next.m.id &&
+    prev.m.role === next.m.role &&
+    prev.m.streaming === next.m.streaming &&
+    prev.m.content === next.m.content
+);
 
 const BreathingGuide: React.FC<{
   onClose: () => void;
@@ -114,10 +211,7 @@ const BreathingGuide: React.FC<{
 };
 
 // 正念冥想组件
-const MindfulnessMeditation: React.FC<{ onClose: () => void; onSave: (text: string) => void }> = ({
-  onClose,
-  onSave
-}) => {
+const MindfulnessMeditation: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [phase, setPhase] = useState<'prepare' | 'breathing' | 'body' | 'thoughts' | 'complete'>('prepare');
   const [timeLeft, setTimeLeft] = useState(600); // 10分钟
   const [isActive, setIsActive] = useState(false);
@@ -164,7 +258,7 @@ const MindfulnessMeditation: React.FC<{ onClose: () => void; onSave: (text: stri
     <>
       <button
         onClick={() => setIsActive(!isActive)}
-        className='btn btn-primary px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-500 active:scale-95 shadow-lg'>
+        className='order-1 col-span-1 btn btn-primary px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-500 active:scale-95 shadow-lg'>
         {isActive ? '暂停' : '开始'}
       </button>
       <button
@@ -174,24 +268,21 @@ const MindfulnessMeditation: React.FC<{ onClose: () => void; onSave: (text: stri
           setPhase('prepare');
           setCurrentStep(0);
         }}
-        className='btn btn-danger px-6 py-3 rounded-xl bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600 active:scale-95'>
+        className='order-2 col-span-1 justify-self-end btn btn-danger px-6 py-3 rounded-xl bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600 active:scale-95'>
         重置
       </button>
-      {phase === 'complete' && (
-        <button
-          onClick={() => {
-            onSave(`正念冥想练习完成\n\n时长：10分钟\n体验：通过专注呼吸、身体扫描和观察思绪，培养了当下觉察力`);
-            onClose();
-          }}
-          className='btn btn-primary px-5 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-300 dark:focus:ring-green-500 active:scale-95'>
-          保存到日记
-        </button>
-      )}
+      {/* 完成阶段不再提供保存到日记按钮 */}
     </>
   );
 
   return (
-    <Modal title='正念冥想' onClose={onClose} footer={footerButtons} className='max-w-md'>
+    <Modal
+      title='正念冥想'
+      onClose={onClose}
+      footer={footerButtons}
+      footerClassName='w-full grid grid-cols-2 gap-2 sm:flex sm:flex-row sm:flex-wrap sm:justify-between sm:items-center'
+      className='max-w-md'
+    >
       <div className='text-center space-y-6'>
         <div className='text-5xl sm:text-6xl mb-4 font-mono text-emerald-600 dark:text-emerald-300'>
           {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
@@ -233,7 +324,7 @@ const MindfulnessMeditation: React.FC<{ onClose: () => void; onSave: (text: stri
 };
 
 // 情绪日记组件
-const EmotionJournal: React.FC<{ onClose: () => void; onSave: (text: string) => void }> = ({ onClose, onSave }) => {
+const EmotionJournal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [currentEmotion, setCurrentEmotion] = useState('');
   const [intensity, setIntensity] = useState(5);
   const [trigger, setTrigger] = useState('');
@@ -267,14 +358,9 @@ const EmotionJournal: React.FC<{ onClose: () => void; onSave: (text: string) => 
   const footerButtons = (
     <>
       <button
-        onClick={() => {
-          const journalEntry = `情绪日记\n\n当前情绪：${currentEmotion}\n强度：${intensity}/10\n\n触发事件：\n${trigger}\n\n想法：\n${thoughts}\n\n身体反应：\n${bodyResponse}\n\n应对方式：\n${coping}`;
-          onSave(journalEntry);
-          onClose();
-        }}
-        disabled={!currentEmotion || !trigger}
-        className='px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-600 active:scale-95'>
-        保存日记
+        onClick={onClose}
+        className='px-5 py-3 rounded-xl bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-500 active:scale-95'>
+        关闭
       </button>
     </>
   );
@@ -363,7 +449,7 @@ const EmotionJournal: React.FC<{ onClose: () => void; onSave: (text: string) => 
 };
 
 // 认知重构组件
-const CognitiveReframe: React.FC<{ onClose: () => void; onSave: (text: string) => void }> = ({ onClose, onSave }) => {
+const CognitiveReframe: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [scene, setScene] = useState('');
   const [automaticThought, setAutomaticThought] = useState('');
   const [evidenceFor, setEvidenceFor] = useState('');
@@ -406,40 +492,30 @@ const CognitiveReframe: React.FC<{ onClose: () => void; onSave: (text: string) =
       title='认知重构练习'
       onClose={onClose}
       footer={
-        <div className='flex flex-row flex-wrap justify-center gap-3'>
-          <button
-            onClick={onClose}
-            className='btn btn-ghost px-5 py-3 rounded-xl bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-500 active:scale-95'>
-            取消
-          </button>
+        <>
           <button
             onClick={generateReframe}
             disabled={!scene || !automaticThought || isGenerating}
-            className='btn btn-primary px-5 py-3 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-500 active:scale-95 disabled:cursor-not-allowed'>
+            className='order-1 col-span-1 btn btn-primary px-5 py-3 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-500 active:scale-95 disabled:cursor-not-allowed'>
             {isGenerating ? '生成中...' : '生成重构'}
           </button>
+          <button
+            onClick={onClose}
+            className='order-2 col-span-1 justify-self-end btn btn-ghost px-5 py-3 rounded-xl bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-500 active:scale-95'>
+            取消
+          </button>
           {reframes.length > 0 && (
-            <>
-              <button
-                onClick={() => generateReframe()}
-                disabled={isGenerating}
-                className='btn btn-ghost px-5 py-3 rounded-xl bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-800/40 text-blue-700 dark:text-blue-200 font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 active:scale-95'>
-                生成新版本
-              </button>
-              <button
-                onClick={() => {
-                  onSave(
-                    `认知重构练习\n\n情境：${scene}\n\n原始想法：${automaticThought}\n\n重构想法：${reframes[selectedVersion]}`
-                  );
-                  onClose();
-                }}
-                className='btn btn-primary px-5 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-300 dark:focus:ring-green-500 active:scale-95'>
-                保存到日记
-              </button>
-            </>
+            <button
+              onClick={() => generateReframe()}
+              disabled={isGenerating}
+              className='order-3 col-span-2 w-full sm:w-auto btn btn-ghost px-5 py-3 rounded-xl bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-800/40 text-blue-700 dark:text-blue-200 font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 active:scale-95'>
+              生成新版本
+            </button>
           )}
-        </div>
-      }>
+        </>
+      }
+      footerClassName='w-full grid grid-cols-2 gap-2 sm:flex sm:flex-row sm:flex-wrap sm:justify-between sm:items-center'
+    >
       <div className='space-y-6'>
         <div>
           <label className='block text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2'>情境描述</label>
@@ -536,9 +612,8 @@ const CognitiveReframe: React.FC<{ onClose: () => void; onSave: (text: string) =
 // 感官回归（原 5-4-3-2-1 Grounding）组件
 const Grounding54321: React.FC<{
   onClose: () => void;
-  onSave: (text: string) => void;
   initialStepDuration?: number;
-}> = ({ onClose, onSave, initialStepDuration = 10 }) => {
+}> = ({ onClose, initialStepDuration = 10 }) => {
   const [five, setFive] = useState('');
   const [four, setFour] = useState('');
   const [three, setThree] = useState('');
@@ -639,14 +714,7 @@ const Grounding54321: React.FC<{
             className='btn btn-ghost px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-100'>
             取消
           </button>
-          <button
-            onClick={() => {
-              onSave(buildText());
-              onClose();
-            }}
-            className='btn btn-primary px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white'>
-            保存到日记
-          </button>
+          {/* 已移除“保存到日记”按钮 */}
         </div>
       }>
       <div className='grid grid-cols-1 gap-3'>
@@ -709,7 +777,7 @@ const Mentor: React.FC = () => {
   const todayRecords = useTodayRecords();
   const stats7d = useMoodStats(7);
   const _trend7d = useMoodTrend(7);
-  const addRecord = useMoodStore(s => s.addRecord);
+
   const { isOnline, connectionType } = useNetworkStatus();
 
   const [showBreath, setShowBreath] = useState(false);
@@ -734,11 +802,13 @@ const Mentor: React.FC = () => {
     {
       id: 'm0',
       role: 'assistant',
-      content: '你好，我在这里陪伴你。先从今天的感受开始吧：有什么让你开心或困扰的？也可以点按下方按钮进行疏导练习～'
+      content:
+        '您好，我是 AI 情绪疏导师，很高兴遇见你 ✨ 无论此刻心情如何，我都在这里陪伴。想聊聊今天发生的事情吗？或者试试下方的放松练习也很不错～'
     }
   ]);
   const [activeTab, setActiveTab] = useState<'chat' | 'exercises'>('chat');
   const [isSending, setIsSending] = useState(false);
+  const [atBottom, setAtBottom] = useState(true);
   // 从配置文件读取分组数据
   const presetGroups = chatPresetGroups;
   const [presetOpen, setPresetOpen] = useState(true);
@@ -779,10 +849,7 @@ const Mentor: React.FC = () => {
   const markInProgress = (key: ExerciseKey) => setExerciseStatus(prev => ({ ...prev, [key]: 'in_progress' }));
   const markCompleted = (key: ExerciseKey) => setExerciseStatus(prev => ({ ...prev, [key]: 'completed' }));
   const markIdle = (key: ExerciseKey) => setExerciseStatus(prev => ({ ...prev, [key]: 'idle' }));
-  const handleSaveWithStatus = (key: ExerciseKey) => (text: string) => {
-    markCompleted(key);
-    saveCustomTextToDiary(text);
-  };
+
   const StatusBadge: React.FC<{ status: ExerciseStatus }> = ({ status }) => {
     const map = {
       idle: { label: '未开始', cls: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-200' },
@@ -807,10 +874,34 @@ const Mentor: React.FC = () => {
     return personaPrompt + '\n' + base;
   }, [stats7d.avgIntensity, stats7d.mostCommonMood, todayRecords.length]);
 
-  // 自动滚动到聊天底部
+  // 自动滚动优化：仅在接近底部或用户刚发送时滚动
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages]);
+    const el = scrollRef.current;
+    if (!el) return;
+    const last = messages[messages.length - 1];
+    const userJustSent = !!last && last.role === 'user';
+    if (atBottom || userJustSent) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      if (userJustSent) {
+        const card = document.getElementById('chat-card');
+        card?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+  }, [messages, atBottom]);
+
+  // 监听滚动计算是否在底部
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const handler = () => {
+      const threshold = 80; // 离底部阈值
+      const isAt = el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
+      setAtBottom(isAt);
+    };
+    el.addEventListener('scroll', handler, { passive: true } as any);
+    handler();
+    return () => el.removeEventListener('scroll', handler);
+  }, [scrollRef]);
 
   // 初始对话仅有引导语时收缩聊天卡片尺寸；开始对话后再扩展
   const hasConversation = useMemo(() => {
@@ -818,6 +909,14 @@ const Mentor: React.FC = () => {
       messages.length > 1 || messages.some(m => m.role === 'user') || messages.some(m => m.streaming);
     return moreThanGreeting;
   }, [messages]);
+
+  // 虚拟化：仅在开始对话后启用（变量高度，动态测量）
+  const rowVirtualizer = useVirtualizer({
+    count: hasConversation ? messages.length : 0,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 120,
+    overscan: 8
+  });
 
   // 一旦开始对话，默认折叠预设问题（用户可手动展开）
   useEffect(() => {
@@ -839,7 +938,11 @@ const Mentor: React.FC = () => {
     setLastError(null);
     setLastPrompt(text);
     const userMsg: ChatBubble = { id: `u-${Date.now()}`, role: 'user', content: text };
-    setMessages(prev => [...prev, userMsg, { id: `a-${Date.now()}`, role: 'assistant', content: '', streaming: true }]);
+    setMessages(prev => [
+      ...prev,
+      userMsg,
+      { id: `a-${Date.now()}`, role: 'assistant', content: '', streaming: true, streamStartAt: Date.now() }
+    ]);
     setInput('');
 
     const history: { role: 'user' | 'assistant' | 'system'; content: string }[] = messages.map(m => ({
@@ -909,7 +1012,11 @@ const Mentor: React.FC = () => {
     setLastError(null);
     setLastPrompt(text);
     const userMsg: ChatBubble = { id: `u-${Date.now()}`, role: 'user', content: text };
-    setMessages(prev => [...prev, userMsg, { id: `a-${Date.now()}`, role: 'assistant', content: '', streaming: true }]);
+    setMessages(prev => [
+      ...prev,
+      userMsg,
+      { id: `a-${Date.now()}`, role: 'assistant', content: '', streaming: true, streamStartAt: Date.now() }
+    ]);
 
     const history: { role: 'user' | 'assistant' | 'system'; content: string }[] = messages.map(m => ({
       role: m.role,
@@ -966,34 +1073,14 @@ const Mentor: React.FC = () => {
     abortCtrl?.abort();
   };
 
-  const saveLastToDiary = () => {
-    // 仅允许保存真正的助手回复（排除初始欢迎语），并且内容非空
-    const lastAssistant = [...messages]
-      .reverse()
-      .find(m => m.role === 'assistant' && m.id !== 'm0' && m.content.trim().length > 0);
-    if (!lastAssistant) {
-      toast.error('暂无可保存的内容，请先发送聊天或等待导师回复');
-      return;
-    }
-    const record: Omit<MoodRecord, 'id' | 'created_at' | 'updated_at'> = {
-      user_id: 'sample-user',
-      mood_type: 'calm' as MoodType,
-      mood_intensity: 6,
-      diary_content: `导师建议摘要：\n${lastAssistant.content}`,
-      tags: ['导师', '建议', '练习']
-    };
-    addRecord(record);
-  };
-
-  const saveCustomTextToDiary = (text: string) => {
-    const record: Omit<MoodRecord, 'id' | 'created_at' | 'updated_at'> = {
-      user_id: 'sample-user',
-      mood_type: 'calm' as MoodType,
-      mood_intensity: 6,
-      diary_content: text,
-      tags: ['导师', '练习']
-    };
-    addRecord(record);
+  // 文本域自适应高度
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const adjustInputHeight = () => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const max = 240; // 最大高度约 240px
+    el.style.height = `${Math.min(el.scrollHeight, max)}px`;
   };
 
   return (
@@ -1257,117 +1344,201 @@ const Mentor: React.FC = () => {
               <Card
                 variant='default'
                 padding='sm'
+                role='alert'
+                aria-live='assertive'
                 className='border border-red-200 dark:border-red-800 bg-red-50/60 dark:bg-red-900/20'>
                 <div className='text-sm sm:text-base text-red-700 dark:text-red-300'>发生错误：{lastError}</div>
                 <div className='text-sm text-gray-500 dark:text-gray-400 mt-1'>
                   网络：{isOnline ? connectionType || 'unknown' : '离线'}
                 </div>
                 <div className='mt-2'>
-                  <button
+                  <Button
+                    variant='primary'
+                    size='sm'
                     onClick={() => {
                       if (lastPrompt) {
                         setInput(lastPrompt);
                         onSend();
                       }
                     }}
-                    className='h-9 sm:h-10 px-3 py-2 text-sm rounded-lg bg-yellow-100 dark:bg-yellow-900/30 hover:bg-yellow-200 dark:hover:bg-yellow-800/40 text-yellow-700 dark:text-yellow-300'>
+                  >
                     重试
-                  </button>
+                  </Button>
                 </div>
               </Card>
             )}
             <Card
+              id='chat-card'
               variant='default'
               padding='md'
               className={
                 hasConversation
-                  ? 'flex-1 min-h-[55svh] sm:min-h-[60svh] lg:min-h-[420px]'
-                  : 'mx-auto w-full min-h-[220px]'
+                  ? 'relative flex-1 min-h-[55svh] sm:min-h-[60svh] lg:min-h-[420px]'
+                  : 'relative mx-auto w-full min-h-[220px]'
               }>
               <div
                 ref={scrollRef}
+                id='chat-log'
                 role='log'
                 aria-live='polite'
+                aria-relevant='additions'
+                aria-busy={isSending || messages.some(m => m.streaming)}
                 className={
                   (hasConversation
                     ? 'h-[55svh] sm:h-[60svh] lg:h-[62svh] xl:h-[56svh] 2xl:h-[52svh] overflow-y-auto overscroll-y-contain'
                     : 'h-auto max-h-[40vh] overflow-y-visible flex items-center justify-center px-2 sm:px-3 lg:px-4 xl:px-6') +
-                  ' space-y-3 sm:space-y-4 pr-1 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent'
+                  ' pr-1 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent'
                 }>
-                {messages.map(m => (
-                  <div
-                    key={m.id}
-                    className={
-                      m.role === 'assistant'
-                        ? `${
-                            hasConversation
-                              ? 'max-w-full sm:max-w-[90%] md:max-w-[85%] lg:max-w-[80%] xl:max-w-[75%] 2xl:max-w-[70%]'
-                              : 'max-w-full sm:max-w-[96%] md:max-w-[94%] lg:max-w-[92%] xl:max-w-[90%] 2xl:max-w-[88%]'
-                          } bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-theme-gray-700/60 ring-1 ring-white/25 dark:ring-theme-gray-700/60 rounded-2xl p-3 shadow-sm dark:shadow-none`
-                        : `ml-auto ${
-                            hasConversation
-                              ? 'max-w-full sm:max-w-[90%] md:max-w-[85%] lg:max-w-[80%] xl:max-w-[75%] 2xl:max-w-[70%]'
-                              : 'max-w-full sm:max-w-[96%] md:max-w-[94%] lg:max-w-[92%] xl:max-w-[90%] 2xl:max-w-[88%]'
-                          } bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-theme-gray-700/60 ring-1 ring-white/25 dark:ring-theme-gray-700/60 rounded-2xl p-3 shadow-sm dark:shadow-none`
-                    }>
-                    {/* 分段呈现：按空行拆段（提升移动端可读性，对齐设置页） */}
-                    <div className='text-sm sm:text-base lg:text-lg text-gray-800 dark:text-gray-200'>
-                      {m.content.split(/\n\n+/).map((seg, i) => (
-                        <p key={i} className='mb-2 whitespace-pre-wrap leading-relaxed xl:leading-loose'>
-                          {seg}
-                        </p>
-                      ))}
-                    </div>
-                    {m.streaming && (
-                      <div className='mt-2 text-xs sm:text-sm text-gray-400 dark:text-gray-500'>正在生成...</div>
-                    )}
-                    {m.streaming && (
+                {hasConversation ? (
+                  <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
+                    {rowVirtualizer.getVirtualItems().map(item => (
                       <div
-                        className='mt-2 h-1.5 sm:h-2 w-20 sm:w-24 rounded-full bg-gray-200 dark:bg-theme-gray-700 animate-pulse'
-                        aria-hidden='true'
-                        aria-busy='true'
-                      />
-                    )}
-                    {/* 执行练习快捷按钮（参数化） */}
-                    {m.role === 'assistant' && (
-                      <div className='mt-3 flex flex-wrap gap-2'>
-                        <button
-                          onClick={() => {
-                            setBreathParams({ totalSeconds: 180, pace: { inhale: 4, hold: 4, exhale: 6 } });
-                            setShowBreath(true);
-                          }}
-                          className='h-8 sm:h-9 px-2 py-1 rounded-lg text-sm bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-800/40 text-blue-700 dark:text-blue-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-700 active:scale-95'>
-                          呼吸练习 · 3分钟
-                        </button>
-                        <button
-                          onClick={() => {
-                            setBreathParams({ totalSeconds: 300, pace: { inhale: 5, hold: 5, exhale: 7 } });
-                            setShowBreath(true);
-                          }}
-                          className='h-8 sm:h-9 px-2 py-1 rounded-lg text-sm bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-800/40 text-blue-700 dark:text-blue-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-700 active:scale-95'>
-                          呼吸练习 · 5分钟（慢）
-                        </button>
-                        <button
-                          onClick={() => setShowReframe(true)}
-                          className='h-8 sm:h-9 px-2 py-1 rounded-lg text-sm bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-800/40 text-purple-700 dark:text-purple-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-700 active:scale-95'>
-                          认知重构练习
-                        </button>
-                        <button
-                          onClick={() => {
-                            setGroundingInitial(15);
-                            setShowGrounding(true);
-                          }}
-                          className='h-8 sm:h-9 px-2 py-1 rounded-lg text-sm bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 dark:hover:bg-emerald-800/40 text-emerald-700 dark:text-emerald-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-700 active:scale-95'>
-                          锚定练习（每步15秒）
-                        </button>
+                        key={messages[item.index].id}
+                        data-index={item.index}
+                        ref={rowVirtualizer.measureElement}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          transform: `translateY(${item.start}px)`
+                        }}
+                      >
+                        <div className='mb-3 sm:mb-4'>
+                          <MessageItem
+                            m={messages[item.index]}
+                            hasConversation={hasConversation}
+                            onStartBreath={(sec, pace) => {
+                              setBreathParams({ totalSeconds: sec, pace });
+                              setShowBreath(true);
+                            }}
+                            onStartReframe={() => setShowReframe(true)}
+                            onStartGrounding={initial => {
+                              setGroundingInitial(initial);
+                              setShowGrounding(true);
+                            }}
+                          />
+                        </div>
                       </div>
-                    )}
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  messages.map(m => (
+                    <MessageItem
+                      key={m.id}
+                      m={m}
+                      hasConversation={hasConversation}
+                      onStartBreath={(sec, pace) => {
+                        setBreathParams({ totalSeconds: sec, pace });
+                        setShowBreath(true);
+                      }}
+                      onStartReframe={() => setShowReframe(true)}
+                      onStartGrounding={initial => {
+                        setGroundingInitial(initial);
+                        setShowGrounding(true);
+                      }}
+                    />
+                  ))
+                )}
               </div>
+              {hasConversation && !atBottom && (
+                <div className='absolute bottom-4 right-4'>
+                  <Button
+                    variant='primary'
+                    size='sm'
+                    aria-label='回到最新消息'
+                    aria-controls='chat-log'
+                    onClick={() => {
+                      const el = scrollRef.current;
+                      if (!el) return;
+                      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+                      setAtBottom(true);
+                    }}
+                  >
+                    回到底部
+                  </Button>
+                </div>
+              )}
             </Card>
 
-            {/* 预设问题：输入框上方常驻，可折叠，分组展示 */}
+            {/* 已将“预计剩余”合并至消息内的“正在生成...”区域 */}
+
+            
+
+            <div className='flex flex-col sm:flex-row items-stretch sm:items-center'>
+              <Card variant='default' padding='sm' className='flex-1 min-w-0 order-1 sm:order-none'>
+                <textarea
+                  ref={inputRef}
+                  rows={2}
+                  value={input}
+                  onChange={e => {
+                    const v = e.target.value;
+                    setInput(v);
+                    adjustInputHeight();
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey && !isSending) {
+                      e.preventDefault();
+                      onSend();
+                    }
+                  }}
+                  placeholder='分享你的想法、感受，或任何想说的话...'
+                  className='w-full bg-white/80 dark:bg-gray-800/90 outline-none text-sm xl:text-base placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-600 rounded-md px-3 py-2 xl:px-4 xl:py-3 transition-all duration-200 border border-gray-200 dark:border-gray-700 shadow-sm focus:shadow-md resize-none overflow-y-auto min-h-[64px] max-h-[240px]'
+                  disabled={isSending}
+                />
+                {/* 输入区操作按钮：左侧“停止/重试”，右侧“发送”；移动端堆叠显示 */}
+                <div className='mt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3' style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+                  <div className='flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full'>
+                    {isSending && (
+                      <button
+                        onClick={stopStreaming}
+                        aria-label='停止生成'
+                        aria-controls='chat-log'
+                        className='w-full sm:w-auto h-11 sm:h-12 xl:h-12 px-3 sm:px-4 xl:px-5 py-2.5 sm:py-3 xl:py-3.5 rounded-2xl bg-gradient-to-r from-red-100 to-red-50 dark:from-red-900/30 dark:to-red-800/20 hover:from-red-200 hover:to-red-100 dark:hover:from-red-800/40 dark:hover:to-red-700/30 text-red-700 dark:text-red-300 font-medium flex items-center justify-center gap-2 transition-all duration-300 hover:scale-105 hover:shadow-md focus:outline-none focus:ring-3 focus:ring-red-300/50 dark:focus:ring-red-600/50 active:scale-95 text-sm sm:text-base xl:text-lg border border-red-200/50 dark:border-red-700/30 min-w-[70px] sm:min-w-[80px] xl:min-w-[90px]'>
+                        <div className='w-2 h-2 xl:w-2.5 xl:h-2.5 bg-red-500 rounded-sm' />
+                        <span className='hidden xs:inline sm:inline'>停止</span>
+                      </button>
+                    )}
+                    {lastError && lastPrompt && !isSending && (
+                      <button
+                        onClick={() => {
+                          setInput(lastPrompt);
+                          onSend();
+                        }}
+                        className='w-full sm:w-auto h-11 sm:h-12 xl:h-12 px-3 sm:px-4 xl:px-5 py-2.5 sm:py-3 xl:py-3.5 rounded-2xl bg-gradient-to-r from-amber-100 to-yellow-50 dark:from-amber-900/30 dark:to-yellow-800/20 hover:from-amber-200 hover:to-yellow-100 dark:hover:from-amber-800/40 dark:hover:to-yellow-700/30 text-amber-700 dark:text-amber-300 font-medium transition-all duration-300 hover:scale-105 hover:shadow-md focus:outline-none focus:ring-3 focus:ring-amber-300/50 dark:focus:ring-amber-600/50 active:scale-95 text-sm sm:text-base xl:text-lg border border-amber-200/50 dark:border-amber-700/30 flex items-center justify-center gap-2 min-w-[70px] sm:min-w-[80px] xl:min-w-[90px]'>
+                        <div className='w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin' />
+                        <span className='hidden xs:inline sm:inline'>重试</span>
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    onClick={onSend}
+                    disabled={isSending}
+                    aria-disabled={isSending}
+                    aria-label='发送消息'
+                    aria-controls='chat-log'
+                    className='w-full sm:w-auto group relative h-11 sm:h-12 xl:h-12 px-4 sm:px-5 xl:px-6 py-2.5 sm:py-3 xl:py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-purple-500/25 focus:outline-none focus:ring-3 focus:ring-purple-500/50 active:scale-95 flex items-center justify-center gap-2 min-w-[100px] sm:min-w-[110px] xl:min-w-[140px] whitespace-nowrap'>
+                    {isSending ? (
+                      <>
+                        <div className='w-4 h-4 xl:w-5 xl:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin motion-reduce:animate-none' />
+                        <span className='text-sm sm:text-base xl:text-lg font-medium whitespace-nowrap'>发送中...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className='w-4 h-4 sm:w-5 sm:h-5 xl:w-6 xl:h-6 transition-transform group-hover:translate-x-0.5' />
+                        <span className='text-sm sm:text-base xl:text-lg font-medium whitespace-nowrap'>发送</span>
+                      </>
+                    )}
+                    {/* 发送按钮光效 */}
+                    <div className='absolute inset-0 rounded-2xl bg-gradient-to-r from-purple-400/0 via-white/20 to-purple-400/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none' />
+                  </button>
+                </div>
+              </Card>
+
+              <div className='flex items-center justify-center sm:justify-start gap-2 sm:gap-3 flex-shrink-0 order-2 sm:order-none'></div>
+            </div>
+
+            {/* 预设问题：输入框下方常驻，可折叠，分组展示 */}
             <Card variant='default' padding='sm' className='overflow-hidden'>
               <div className='flex items-center justify-between'>
                 <div className='text-sm sm:text-base text-gray-600 dark:text-gray-300'>试试这些问题：</div>
@@ -1419,100 +1590,6 @@ const Mentor: React.FC = () => {
               </div>
             </Card>
 
-            <div className='flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3'>
-              <Card variant='default' padding='sm' className='flex-1 min-w-0 order-1 sm:order-none'>
-                <input
-                  value={input}
-                  onChange={e => {
-                    const v = e.target.value;
-                    setInput(v);
-                  }}
-                  onKeyPress={e => e.key === 'Enter' && !isSending && onSend()}
-                  placeholder='说说此刻的感受或困扰...'
-                  className='w-full bg-transparent outline-none text-sm xl:text-base placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-600 rounded-md px-3 py-2 xl:px-4 xl:py-3 transition-all duration-200'
-                  disabled={isSending}
-                />
-              </Card>
-
-              <div className='flex items-center justify-center sm:justify-start gap-2 sm:gap-3 flex-shrink-0 order-2 sm:order-none'>
-                <button
-                  onClick={onSend}
-                  className='group relative h-11 sm:h-12 xl:h-14 px-4 sm:px-6 xl:px-8 py-2.5 sm:py-3 xl:py-4 rounded-2xl bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-purple-500/25 focus:outline-none focus:ring-3 focus:ring-purple-500/50 active:scale-95 flex items-center justify-center gap-2 min-w-[90px] sm:min-w-[110px] xl:min-w-[130px] flex-1 sm:flex-none'>
-                  {isSending ? (
-                    <>
-                      <div className='w-4 h-4 xl:w-5 xl:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin' />
-                      <span className='text-sm sm:text-base xl:text-lg font-medium'>发送中...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className='w-4 h-4 sm:w-5 sm:h-5 xl:w-6 xl:h-6 transition-transform group-hover:translate-x-0.5' />
-                      <span className='text-sm sm:text-base xl:text-lg font-medium'>发送</span>
-                    </>
-                  )}
-                  {/* 发送按钮光效 */}
-                  <div className='absolute inset-0 rounded-2xl bg-gradient-to-r from-purple-400/0 via-white/20 to-purple-400/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none' />
-                </button>
-
-                {isSending && (
-                  <button
-                    onClick={stopStreaming}
-                    className='h-11 sm:h-12 xl:h-14 px-3 sm:px-4 xl:px-6 py-2.5 sm:py-3 xl:py-4 rounded-2xl bg-gradient-to-r from-red-100 to-red-50 dark:from-red-900/30 dark:to-red-800/20 hover:from-red-200 hover:to-red-100 dark:hover:from-red-800/40 dark:hover:to-red-700/30 text-red-700 dark:text-red-300 font-medium flex items-center justify-center gap-2 transition-all duration-300 hover:scale-105 hover:shadow-md focus:outline-none focus:ring-3 focus:ring-red-300/50 dark:focus:ring-red-600/50 active:scale-95 text-sm sm:text-base xl:text-lg border border-red-200/50 dark:border-red-700/30 min-w-[70px] sm:min-w-[80px] xl:min-w-[100px]'>
-                    <div className='w-2 h-2 xl:w-2.5 xl:h-2.5 bg-red-500 rounded-sm' />
-                    <span className='hidden xs:inline sm:inline'>停止</span>
-                  </button>
-                )}
-
-                {/* 错误重试 */}
-                {lastError && lastPrompt && !isSending && (
-                  <button
-                    onClick={() => {
-                      setInput(lastPrompt);
-                      onSend();
-                    }}
-                    className='h-11 sm:h-12 px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl bg-gradient-to-r from-amber-100 to-yellow-50 dark:from-amber-900/30 dark:to-yellow-800/20 hover:from-amber-200 hover:to-yellow-100 dark:hover:from-amber-800/40 dark:hover:to-yellow-700/30 text-amber-700 dark:text-amber-300 font-medium transition-all duration-300 hover:scale-105 hover:shadow-md focus:outline-none focus:ring-3 focus:ring-amber-300/50 dark:focus:ring-amber-600/50 active:scale-95 text-sm sm:text-base border border-amber-200/50 dark:border-amber-700/30 flex items-center justify-center gap-2 min-w-[70px] sm:min-w-[80px]'>
-                    <div className='w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin' />
-                    <span className='hidden xs:inline sm:inline'>重试</span>
-                  </button>
-                )}
-
-                <button
-                  onClick={saveLastToDiary}
-                  className='group relative h-11 sm:h-12 px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 dark:from-emerald-600 dark:to-emerald-700 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium flex items-center justify-center gap-2 transition-all duration-300 hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-3 focus:ring-emerald-500/40 active:scale-95 border border-emerald-500/40 min-w-[50px] sm:min-w-[130px] flex-1 sm:flex-none'>
-                  <Save className='w-4 h-4 sm:w-5 sm:h-5 transition-transform group-hover:scale-110' />
-                  <span className='text-sm font-medium sm:hidden'>保存</span>
-                  <span className='text-sm sm:text-base font-medium hidden sm:inline'>保存到日记</span>
-                  {/* 保存按钮微光效果 */}
-                  <div className='absolute inset-0 rounded-2xl bg-gradient-to-r from-emerald-300/0 via-white/15 to-emerald-300/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none' />
-                </button>
-              </div>
-            </div>
-
-            {/* 时间剩余估计（基于速率与目标长度的启发式） */}
-            {isSending && (
-              <div className='flex items-center gap-3 text-xs text-gray-500 animate-pulse'>
-                <div className='flex gap-1'>
-                  <div
-                    className='w-1 h-1 bg-purple-500 rounded-full animate-bounce'
-                    style={{ animationDelay: '0ms' }}></div>
-                  <div
-                    className='w-1 h-1 bg-purple-500 rounded-full animate-bounce'
-                    style={{ animationDelay: '100ms' }}></div>
-                  <div
-                    className='w-1 h-1 bg-purple-500 rounded-full animate-bounce'
-                    style={{ animationDelay: '200ms' }}></div>
-                </div>
-                {(() => {
-                  const target = 800; // 目标字符数（启发式）
-                  const elapsedSec = sendStartAt ? Math.max(1, (Date.now() - sendStartAt) / 1000) : 1;
-                  const rate = progress / elapsedSec; // 字/秒
-                  const remainingChars = Math.max(0, target - progress);
-                  const estSec = Math.round(remainingChars / Math.max(8, rate)); // 至少 8 字/秒
-                  const mm = Math.floor(estSec / 60);
-                  const ss = estSec % 60;
-                  return <span>预计剩余 {mm > 0 ? `${mm}分${ss}秒` : `${ss}秒`}</span>;
-                })()}
-              </div>
-            )}
 
             {/* 移动端安全声明 */}
             <Card variant='default' padding='sm' className='xl:hidden'>
@@ -1544,7 +1621,6 @@ const Mentor: React.FC = () => {
             setShowReframe(false);
             markIdle('reframe');
           }}
-          onSave={handleSaveWithStatus('reframe')}
         />
       )}
       {showGrounding && (
@@ -1553,7 +1629,6 @@ const Mentor: React.FC = () => {
             setShowGrounding(false);
             markIdle('grounding');
           }}
-          onSave={handleSaveWithStatus('grounding')}
           initialStepDuration={groundingInitial ?? 10}
         />
       )}
@@ -1563,7 +1638,6 @@ const Mentor: React.FC = () => {
             setShowMindfulness(false);
             markIdle('mindfulness');
           }}
-          onSave={handleSaveWithStatus('mindfulness')}
         />
       )}
       {JOURNAL_ENABLED && showEmotionJournal && (
@@ -1572,7 +1646,6 @@ const Mentor: React.FC = () => {
             setShowEmotionJournal(false);
             markIdle('journal');
           }}
-          onSave={handleSaveWithStatus('journal')}
         />
       )}
     </>

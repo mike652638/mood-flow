@@ -23,7 +23,7 @@ const Layout = ({ immersiveMode = false, currentTheme = 'light' }: LayoutProps) 
     () => [
       { path: '/home', icon: Home, label: '首页' },
       { path: '/record', icon: PenTool, label: '记录' },
-      { path: '/mentor', icon: MessageSquare, label: '导师' },
+      { path: '/mentor', icon: MessageSquare, label: 'AI 伴聊' },
       { path: '/analytics', icon: BarChart3, label: '分析' },
       { path: '/settings', icon: Settings, label: '设置' }
     ],
@@ -146,7 +146,7 @@ const Layout = ({ immersiveMode = false, currentTheme = 'light' }: LayoutProps) 
                       isActive
                         ? 'text-purple-600 dark:text-purple-300 bg-white/80 dark:bg-theme-gray-700/80 shadow-lg border-white/50 dark:border-theme-gray-600/50 scale-[1.02]'
                         : 'text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-300 hover:bg-white/60 dark:hover:bg-theme-gray-700/60 active:scale-95 border-transparent'
-                   }`}>
+                    }`}>
                     <Icon
                       className={`w-5 h-5 sm:w-6 sm:h-6 mb-0.5 sm:mb-1 transition-transform duration-200 ${
                         isActive ? 'scale-110' : 'group-hover:scale-110 group-active:scale-95'

@@ -13,7 +13,7 @@ export const chatPresetGroups: PresetGroup[] = [
       bg: 'bg-teal-50 dark:bg-teal-900/20',
       text: 'text-teal-700 dark:text-teal-200'
     },
-    items: ['我今天有些焦虑，能帮我放松吗？', '帮我做一次3分钟呼吸练习']
+    items: ['我有些焦虑，能引导我放松吗？', '请引导我做一次3分钟呼吸练习']
   },
   {
     label: '认知重构',
@@ -22,7 +22,7 @@ export const chatPresetGroups: PresetGroup[] = [
       bg: 'bg-indigo-50 dark:bg-indigo-900/20',
       text: 'text-indigo-700 dark:text-indigo-200'
     },
-    items: ['帮我用认知重构看待今天的困扰', '我在某件事上总是负面思考，怎么办？']
+    items: ['帮我用认知重构看待今天的困扰', '我习惯性地负面思考，怎么办？']
   },
   {
     label: '睡眠与作息',
@@ -31,7 +31,7 @@ export const chatPresetGroups: PresetGroup[] = [
       bg: 'bg-violet-50 dark:bg-violet-900/20',
       text: 'text-violet-700 dark:text-violet-200'
     },
-    items: ['我最近睡前很难放松，有什么建议？', '我想改善入睡前的焦虑']
+    items: ['我最近入睡困难，有什么建议？', '我想改善入睡前的焦虑']
   },
   {
     label: '工作与压力',
@@ -40,6 +40,6 @@ export const chatPresetGroups: PresetGroup[] = [
       bg: 'bg-amber-50 dark:bg-amber-900/20',
       text: 'text-amber-700 dark:text-amber-200'
     },
-    items: ['我对工作感到压力大，如何缓解？', '我担心今天的任务做不好，怎么办？']
+    items: ['我对工作感到压力大，如何缓解？', '我担心工作做不好，怎么办？']
   }
 ];

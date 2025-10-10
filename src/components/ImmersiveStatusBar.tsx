@@ -78,6 +78,14 @@ const ImmersiveStatusBar: React.FC<ImmersiveStatusBarProps> = ({
           const root = document.documentElement;
           const headerEl = document.querySelector('header') as HTMLElement | null;
 
+          // 动态更新 Header 高度变量，避免不同设备/字体缩放导致首个板块被遮挡
+          if (headerEl) {
+            const h = headerEl.offsetHeight;
+            if (Number.isFinite(h) && h > 0) {
+              root.style.setProperty('--header-height', `${h}px`);
+            }
+          }
+
           const toRgb = (color: string): { r: number; g: number; b: number } => {
             const clamp = (n: number) => Math.max(0, Math.min(255, Math.round(n)));
             if (!color) return { r: 255, g: 255, b: 255 };
@@ -206,6 +214,34 @@ const ImmersiveStatusBar: React.FC<ImmersiveStatusBarProps> = ({
     };
 
     updateStatusBar();
+
+    // 监听窗口尺寸/方向变化，重新计算 Header 高度
+    const resizeHandler = () => {
+      try {
+        const headerEl = document.querySelector('header') as HTMLElement | null;
+        if (headerEl) {
+          const h = headerEl.offsetHeight;
+          if (Number.isFinite(h) && h > 0) {
+            document.documentElement.style.setProperty('--header-height', `${h}px`);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to update header height:', error);
+      }
+    };
+
+    window.addEventListener('resize', resizeHandler);
+    window.addEventListener('orientationchange', resizeHandler as any);
+    const timer = setTimeout(resizeHandler, 300);
+    return () => {
+      try {
+        window.removeEventListener('resize', resizeHandler);
+        window.removeEventListener('orientationchange', resizeHandler as any);
+        clearTimeout(timer);
+      } catch (error) {
+        console.error('Failed to remove event listeners:', error);
+      }
+    };
   }, [isNative, immersive, theme, backgroundColor, enableTransition, debugMode, showIndicator]);
 
   return null;

@@ -785,7 +785,9 @@ const Record = () => {
               placeholder='分享你的想法和感受...'
               rows={3}
               className={`form-input w-full px-3 py-3 sm:px-4 sm:py-4 lg:px-6 lg:py-6 border rounded-lg lg:rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-theme-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 resize-none text-sm sm:text-base lg:text-lg leading-relaxed ${
-                validationErrors.diary ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-theme-gray-600'
+                validationErrors.diary
+                  ? 'border-red-500 dark:border-red-500'
+                  : 'border-gray-300 dark:border-theme-gray-600'
               }`}
             />
             {validationErrors.diary && (
@@ -890,21 +892,21 @@ const Record = () => {
               </div>
 
               {/* 自定义标签输入 */}
-              <div className='flex gap-2 sm:gap-3 lg:gap-4'>
+              <div className='grid grid-cols-[1fr_auto] items-stretch gap-2 sm:gap-3 lg:gap-4'>
                 <input
                   type='text'
                   value={newTag}
                   onChange={e => setNewTag(e.target.value)}
                   onKeyPress={e => e.key === 'Enter' && addCustomTag()}
                   placeholder='添加自定义标签'
-                  className='form-input flex-1 px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4 text-sm sm:text-base lg:text-lg border border-gray-200 dark:border-theme-gray-600 rounded-lg lg:rounded-xl bg-white dark:bg-theme-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent'
+                  className='form-input w-full min-w-0 px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4 text-sm sm:text-base lg:text-lg border border-gray-200 dark:border-theme-gray-600 rounded-lg lg:rounded-xl bg-white dark:bg-theme-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent'
                 />
                 <button
                   onClick={addCustomTag}
                   aria-label='添加自定义标签'
-                  className='btn btn-primary px-4 sm:px-6 lg:px-8 py-2 sm:py-3 lg:py-4 bg-purple-500 text-white rounded-lg lg:rounded-xl hover:bg-purple-600 transition-colors duration-200 flex items-center gap-1 sm:gap-2 text-sm sm:text-base lg:text-lg'>
-                  <Plus className='w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6' />
-                  添加
+                  className='btn btn-primary flex-shrink-0 px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4 bg-purple-500 text-white rounded-lg lg:rounded-xl hover:bg-purple-600 transition-colors duration-200 flex items-center gap-1 sm:gap-2 text-xs sm:text-sm lg:text-lg leading-none whitespace-nowrap min-w-[88px] sm:min-w-[96px] max-w-[45%] sm:max-w-none overflow-hidden'>
+                  <Plus size={20} strokeWidth={2.25} className='w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 shrink-0' />
+                  <span>添加</span>
                 </button>
               </div>
 

@@ -19,7 +19,7 @@ const Header = ({ title, showBackButton = false, onBack, className = '', immersi
   const navItems = [
     { path: '/home', label: '首页' },
     { path: '/record', label: '记录' },
-    { path: '/mentor', label: '导师' },
+    { path: '/mentor', label: 'AI 伴聊' },
     { path: '/analytics', label: '分析' },
     { path: '/settings', label: '设置管理' }
   ];
