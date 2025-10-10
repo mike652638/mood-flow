@@ -73,7 +73,7 @@ export async function checkForUpdate(customUrl?: string): Promise<UpdateCheckRes
         candidates.push(base);
       }
     }
-  } catch (err) {
+  } catch {
     // 忽略本地包读取错误
   }
 
