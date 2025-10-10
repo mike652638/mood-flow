@@ -1,13 +1,13 @@
 ﻿{
     "ok":  true,
-    "tag":  "v1.2.6",
+    "tag":  "v1.2.7",
     "branch":  "main",
-    "head_sha":  "898c3423128d62b31a4f58102803dbc77aea904b",
-    "run_id":  18409815393,
-    "run_number":  90,
+    "head_sha":  "ac737c0b61d1e710b5ba192b0c15fc51313dc23d",
+    "run_id":  18410356833,
+    "run_number":  91,
     "status":  "completed",
     "conclusion":  "success",
-    "html_url":  "https://github.com/mike652638/mood-flow/actions/runs/18409815393",
+    "html_url":  "https://github.com/mike652638/mood-flow/actions/runs/18410356833",
     "workflow_name":  "Build Android APK",
     "workflow_path":  ".github/workflows/build-android.yml",
     "jobs":  [
@@ -22,8 +22,8 @@
                      "conclusion":  "success"
                  }
              ],
-    "release_url":  "https://github.com/mike652638/mood-flow/releases/tag/v1.2.6",
-    "r2_apk_url":  "https://pub-0bd3064e8b4743b19a2219ed6f880902.r2.dev/releases/mood-flow-1.2.6-store-202510101443-r90-g898c342.apk",
-    "apk_release_asset_url":  "https://github.com/mike652638/mood-flow/releases/download/v1.2.6/app-release.apk",
+    "release_url":  "https://github.com/mike652638/mood-flow/releases/tag/v1.2.7",
+    "r2_apk_url":  "https://pub-0bd3064e8b4743b19a2219ed6f880902.r2.dev/releases/mood-flow-1.2.7-store-202510101506-r91-gac737c0.apk",
+    "apk_release_asset_url":  "https://github.com/mike652638/mood-flow/releases/download/v1.2.7/app-release.apk",
     "apk_source":  "release_body"
 }
