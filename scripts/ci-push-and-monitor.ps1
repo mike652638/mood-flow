@@ -184,7 +184,7 @@ function Find-Run-ByHeadSha {
     [string]$WorkflowEvent = "push"
   )
   Write-Host "[DEBUG] Find-Run-ByHeadSha: Searching for sha=$HeadSha, branch=$Branch, event=$WorkflowEvent"
-    $url = "https://api.github.com/repos/$Owner/$Repo/actions/runs?head_sha=$HeadSha&branch=$Branch&event=$WorkflowEvent&status=in_progress,queued,requested,waiting"
+  $url = "https://api.github.com/repos/$Owner/$Repo/actions/runs?head_sha=$HeadSha&branch=$Branch&event=$WorkflowEvent&status=in_progress,queued,requested,waiting"
   $runs = Invoke-GhRest -Method GET -Uri $url
   if ($runs -and $runs.total_count -gt 0) {
     # Sort by created_at descending to get the latest run
@@ -209,17 +209,19 @@ function Find-Run-ByGhCommit {
         Write-Host "[DEBUG] Find-Run-ByGhCommit: Found Build Android APK run $($targetRun.databaseId) via gh commit list"
         # Convert to a format compatible with REST API response
         return @{
-          id = [long]$targetRun.databaseId
-          status = $targetRun.status
+          id         = [long]$targetRun.databaseId
+          status     = $targetRun.status
           conclusion = $targetRun.conclusion
-          name = $targetRun.workflowName
-          html_url = $targetRun.url
-          head_sha = $targetRun.headSha
+          name       = $targetRun.workflowName
+          html_url   = $targetRun.url
+          head_sha   = $targetRun.headSha
         }
-      } else {
+      }
+      else {
         Write-Host "[DEBUG] Find-Run-ByGhCommit: No Build Android APK workflow found for commit $CommitSha"
       }
-    } else {
+    }
+    else {
       Write-Host "[DEBUG] Find-Run-ByGhCommit: No runs found for commit $CommitSha"
     }
   }
@@ -248,12 +250,20 @@ function Save-SummaryJson {
 function Get-JobLogsText {
   param([string]$Owner, [string]$Repo, [long]$JobId, [string]$Token)
   try {
-    $headers = @{ 'Accept' = 'application/vnd.github+json' }
+    $headers = @{}
     if ($Token) { $headers['Authorization'] = ('Bearer ' + $Token); $headers['X-GitHub-Api-Version'] = '2022-11-28' }
-    $url = ('https://api.github.com/repos/' + $Owner + '/' + $Repo + '/actions/jobs/' + $JobId + '/logs')
-    # GitHub API returns plain text logs directly
-    $response = Invoke-RestMethod -Uri $url -Headers $headers -Method GET
-    return $response
+    $path = ('repos/' + $Owner + '/' + $Repo + '/actions/jobs/' + $JobId + '/logs')
+    $url = ('https://api.github.com/' + $path)
+    # First try gh CLI which reliably returns text logs
+    $txt = $null
+    try {
+      $txt = (& gh api $path --silent 2>$null | Out-String)
+    } catch { $txt = $null }
+    if (-not $txt) {
+      # Fallback to REST; this endpoint returns text/plain
+      $txt = Invoke-RestMethod -Uri $url -Headers $headers -Method GET
+    }
+    return [string]$txt
   }
   catch {
     Write-Warn ("Failed to download/parse job logs: " + $_.Exception.Message)
@@ -275,6 +285,9 @@ function Get-R2Url-FromLogs {
   # Additional fallback: look for any R2 URL pattern
   $m3 = [regex]::Match($LogsText, '(https?://[^\s]*\.r2\.cloudflarestorage\.com/[^\s]+\.apk)')
   if ($m3.Success) { return $m3.Groups[1].Value }
+  # Public dev domain pattern: https://pub-<id>.r2.dev/...
+  $m4 = [regex]::Match($LogsText, '(https?://[^\s]*\.r2\.dev/[^\s]+\.apk)')
+  if ($m4.Success) { return $m4.Groups[1].Value }
   return $null
 }
 
@@ -418,21 +431,33 @@ try {
     r2_apk_url    = $null
   }
 
-  # Attempt to extract R2 public URL from build job logs
+  # Attempt to extract R2 public URL from job logs (build-android, publish-release), with aggregated fallback
   try {
+    $r2Url = $null
     if ($jobs) {
-      $buildJob = $jobs | Where-Object { $_.name -eq 'build-android' } | Select-Object -First 1
-      if ($buildJob -and $buildJob.id) {
-        $logsText = Get-JobLogsText -Owner $owner -Repo $repo -JobId ([long]$buildJob.id) -Token $token
-        $r2Url = Get-R2Url-FromLogs -LogsText $logsText
-        if ($r2Url) {
-          $summary.r2_apk_url = $r2Url
-          Write-Ok ("Detected R2 APK URL: " + $r2Url)
-        }
-        else {
-          Write-Warn 'R2 APK URL not found in logs; it may be unavailable or secrets not set.'
+      $candidates = @('build-android', 'publish-release')
+      foreach ($jn in $candidates) {
+        if ($r2Url) { break }
+        $job = $jobs | Where-Object { $_.name -eq $jn } | Select-Object -First 1
+        if ($job -and $job.id) {
+          $logsText = Get-JobLogsText -Owner $owner -Repo $repo -JobId ([long]$job.id) -Token $token
+          $r2Url = Get-R2Url-FromLogs -LogsText $logsText
         }
       }
+    }
+    if (-not $r2Url -and $summary.run_id) {
+      # Fallback: aggregated logs for the whole run via gh CLI
+      try {
+        $aggLogs = (& gh run view $summary.run_id --log 2>$null | Out-String)
+        $r2Url = Get-R2Url-FromLogs -LogsText $aggLogs
+      } catch {}
+    }
+    if ($r2Url) {
+      $summary.r2_apk_url = $r2Url
+      Write-Ok ("Detected R2 APK URL: " + $r2Url)
+    }
+    else {
+      Write-Warn 'R2 APK URL not found in logs; it may be unavailable or secrets not set.'
     }
   }
   catch {
