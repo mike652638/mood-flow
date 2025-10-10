@@ -461,6 +461,19 @@ jobs:
           DEST="s3://${R2_BUCKET}/releases/updates.json"
           aws --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" s3 cp "$SRC" "$DEST" --content-type application/json --acl public-read || true
 
+      - name: Append R2 APK URL marker to release notes
+        if: ${{ env.R2_URL != '' }}
+        shell: bash
+        run: |
+          set -e
+          BODY="dist/meta/release-notes.md"
+          if [ -f "$BODY" ]; then
+            echo "R2_APK_URL: ${R2_URL}" >> "$BODY"
+            echo "Appended R2_APK_URL marker to release notes"
+          else
+            echo "Release notes body missing at $BODY; skipping marker append" >&2
+          fi
+
       - name: Commit updates.json back to repo (branch runs only)
         if: ${{ env.R2_URL != '' && github.event_name != 'pull_request' && startsWith(github.ref, 'refs/heads/') }}
         shell: bash

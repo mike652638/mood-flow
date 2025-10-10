@@ -293,40 +293,62 @@ function Get-JobLogsText {
   }
 }
 
+# Fetch release info by tag via GitHub REST
+function Get-ReleaseByTag {
+  param([string]$Owner, [string]$Repo, [string]$Tag, [string]$Token)
+  try {
+    $headers = @{}
+    if ($Token) { $headers['Authorization'] = ('Bearer ' + $Token); $headers['X-GitHub-Api-Version'] = '2022-11-28' }
+    $url = ('https://api.github.com/repos/' + $Owner + '/' + $Repo + '/releases/tags/' + $Tag)
+    return Invoke-RestMethod -Uri $url -Headers $headers -Method GET
+  }
+  catch {
+    Write-Warn ("Failed to fetch release by tag: " + $_.Exception.Message)
+    return $null
+  }
+}
+
 # Extract Cloudflare R2 public APK URL from logs where update-updates-json.cjs prints command line
 function Get-R2Url-FromLogs {
   param([string]$LogsText)
   if (-not $LogsText) { return $null }
-  # Look for: Running: node scripts/update-updates-json.cjs --apk-url https://... .apk
-  $pattern = 'Running:\s+node\s+scripts/update-updates-json\.cjs\s+--apk-url\s+(https?://[^\s]+\.apk)'
-  $m = [regex]::Match($LogsText, $pattern)
-  if ($m.Success) { return $m.Groups[1].Value }
-  # Notice annotation printed by workflow: ::notice title=R2 APK URL::<url>
-  $mNotice = [regex]::Match($LogsText, '::notice\s+title=R2\s+APK\s+URL::(https?://[^\s]+\.apk)')
-  if ($mNotice.Success) { return $mNotice.Groups[1].Value }
-  # Explicit echo: Resolved R2 APK public URL: <url>
-  $mEcho = [regex]::Match($LogsText, 'Resolved\s+R2\s+APK\s+public\s+URL:\s+(https?://[^\s]+\.apk)')
-  if ($mEcho.Success) { return $mEcho.Groups[1].Value }
-  # Fallback: look for mood-flow-*.apk public URL printed elsewhere
-  $m2 = [regex]::Match($LogsText, '(https?://[^\s]+/releases/mood-flow-[^\s]+\.apk)')
-  if ($m2.Success) { return $m2.Groups[1].Value }
-  # Additional fallback: look for any R2 URL pattern
-  $m3 = [regex]::Match($LogsText, '(https?://[^\s]*\.r2\.cloudflarestorage\.com/[^\s]+\.apk)')
-  if ($m3.Success) { return $m3.Groups[1].Value }
-  # Public dev domain pattern: https://pub-<id>.r2.dev/...
-  $m4 = [regex]::Match($LogsText, '(https?://[^\s]*\.r2\.dev/[^\s]+\.apk)')
-  if ($m4.Success) { return $m4.Groups[1].Value }
-  # Fallback via updates.json: find resolved update URL in logs and fetch androidApkUrl
-  $m5 = [regex]::Match($LogsText, 'Resolved update URL:\s+(https?://[^\s]+/updates\.json)')
-  if ($m5.Success) {
-    $updatesUrl = $m5.Groups[1].Value
-    try {
-      $resp = Invoke-RestMethod -Uri $updatesUrl -Method GET -TimeoutSec 30 -Headers @{ Accept = 'application/json' }
-      if ($resp -and $resp.androidApkUrl) { return [string]$resp.androidApkUrl }
-    }
-    catch {}
+  # Collect multiple possible URL candidates
+  $candidates = @()
+  $patterns = @(
+    'Running:\s+node\s+scripts/update-updates-json\.cjs\s+--apk-url\s+(https?://[^\s"<>]+\.apk)',
+    '::notice\s+title=R2\s+APK\s+URL::(https?://[^\s"<>]+\.apk)',
+    'Resolved\s+R2\s+APK\s+public\s+URL:\s+(https?://[^\s"<>]+\.apk)',
+    'androidApkUrl\s*[:=]\s*(https?://[^\s"<>]+\.apk)',
+    '(https?://[^\s"<>]+/releases/[^\s"<>]+\.apk)',
+    '(https?://[^\s"<>]*\.r2\.cloudflarestorage\.com/[^\s"<>]+\.apk)',
+    '(https?://[^\s"<>]*\.r2\.dev/[^\s"<>]+\.apk)'
+  )
+  foreach ($p in $patterns) {
+    $m = [regex]::Match($LogsText, $p)
+    if ($m.Success) { $candidates += $m.Groups[1].Value }
   }
-  return $null
+  foreach ($m in [regex]::Matches($LogsText, '(https?://[^\s"<>]+\.apk)')) {
+    if ($m.Success) { $candidates += $m.Groups[1].Value }
+  }
+  $candidates = $candidates | Sort-Object -Unique
+
+  # If updates.json URL is present in logs, try resolve androidApkUrl
+  $mUpdate = [regex]::Match($LogsText, 'Resolved update URL:\s+(https?://[^\s"<>]+/updates\.json)')
+  if ($mUpdate.Success) {
+    try {
+      $updatesUrl = $mUpdate.Groups[1].Value
+      $resp = Invoke-RestMethod -Uri $updatesUrl -Method GET -TimeoutSec 30 -Headers @{ Accept = 'application/json' }
+      if ($resp -and $resp.androidApkUrl) { $candidates = @([string]$resp.androidApkUrl) + $candidates }
+    } catch {}
+  }
+
+  if (-not $candidates -or $candidates.Count -eq 0) { return $null }
+
+  # Prefer R2 domains
+  $prefer = $candidates | Where-Object { $_ -match '\.r2\.cloudflarestorage\.com' -or $_ -match '\.r2\.dev' }
+  if ($prefer -and $prefer.Count -gt 0) { return ($prefer | Select-Object -First 1) }
+  # Otherwise return first candidate
+  return ($candidates | Select-Object -First 1)
 }
 
 try {
@@ -467,13 +489,18 @@ try {
     jobs          = $jobs | ForEach-Object { @{ name = $_.name; status = $_.status; conclusion = $_.conclusion } }
     release_url   = "https://github.com/$owner/$repo/releases/tag/$tagName"
     r2_apk_url    = $null
+    apk_release_asset_url = $null
+    apk_source    = $null
   }
 
   # Attempt to extract R2 public URL from job logs (build-android, publish-release), with aggregated fallback
   try {
     $r2Url = $null
     if ($jobs) {
-      $candidates = @('build-android', 'publish-release')
+      $candidates = @(
+        'build-android', 'Build Android APK', 'android', 'android:build', 'build',
+        'publish-release', 'Publish Release', 'release', 'publish'
+      )
       foreach ($jn in $candidates) {
         if ($r2Url) { break }
         $job = $jobs | Where-Object { $_.name -eq $jn } | Select-Object -First 1
@@ -516,10 +543,51 @@ try {
     }
     if ($r2Url) {
       $summary.r2_apk_url = $r2Url
+      $summary.apk_source = 'logs'
       Write-Ok ("Detected R2 APK URL: " + $r2Url)
     }
     else {
-      Write-Warn 'R2 APK URL not found in logs; it may be unavailable or secrets not set.'
+      # Try release body and assets as additional fallbacks
+      $rel = $null
+      try { $rel = Get-ReleaseByTag -Owner $owner -Repo $repo -Tag $tagName -Token $token } catch {}
+      if ($rel) {
+        # Parse R2 URL from release body (prefer strict marker line)
+        $bodyR2 = $null
+        if ($rel.body) {
+          # Strict marker: lines starting with R2_APK_URL:
+          $strict = [regex]::Match([string]$rel.body, '(?m)^\s*R2_APK_URL:\s*(https?://[^\s\)"<>]+\.apk)')
+          if ($strict.Success) {
+            $bodyR2 = $strict.Groups[1].Value
+          }
+          else {
+            # Generic scan fallback
+            $matches = [regex]::Matches([string]$rel.body, '(https?://[^\s\)"<>]+\.apk)')
+            if ($matches.Count -gt 0) {
+              $urls = @()
+              foreach ($m in $matches) { $urls += $m.Groups[1].Value }
+              $prefer = $urls | Where-Object { $_ -match '\.r2\.cloudflarestorage\.com' -or $_ -match '\.r2\.dev' }
+              if ($prefer -and $prefer.Count -gt 0) { $bodyR2 = ($prefer | Select-Object -First 1) }
+              else { $bodyR2 = ($urls | Select-Object -First 1) }
+            }
+          }
+        }
+        if ($bodyR2) {
+          $summary.r2_apk_url = $bodyR2
+          $summary.apk_source = 'release_body'
+          Write-Ok ("Detected R2 APK URL from release body: " + $bodyR2)
+        }
+        # Capture GitHub release asset URL (.apk) for reference
+        if ($rel.assets) {
+          $apkAsset = $rel.assets | Where-Object { $_.browser_download_url -match '\.apk$' } | Select-Object -First 1
+          if ($apkAsset) {
+            $summary.apk_release_asset_url = [string]$apkAsset.browser_download_url
+            Write-Info ("Found release asset APK: " + $summary.apk_release_asset_url)
+          }
+        }
+      }
+      if (-not $summary.r2_apk_url) {
+        Write-Warn 'R2 APK URL not found via logs or release body; it may be unavailable or secrets not set.'
+      }
     }
   }
   catch {
