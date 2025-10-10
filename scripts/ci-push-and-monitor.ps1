@@ -11,6 +11,26 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Default UpdateUrl resolution (R2 base > R2 bucket > local file)
+if (-not $UpdateUrl -or $UpdateUrl -eq '') {
+  try {
+    if ($env:R2_PUBLIC_BASE) {
+      $UpdateUrl = ($env:R2_PUBLIC_BASE.TrimEnd('/') + '/releases/updates.json')
+    }
+    elseif ($env:R2_BUCKET) {
+      $UpdateUrl = ('https://' + $env:R2_BUCKET + '.r2.dev/releases/updates.json')
+    }
+    else {
+      # Fallback to local file path; app side has multi-source fallback logic
+      $UpdateUrl = 'public/updates.json'
+    }
+    Write-Info ('Default UpdateUrl: ' + $UpdateUrl)
+  }
+  catch {
+    Write-Warn ('Failed to resolve default UpdateUrl: ' + $_.Exception.Message)
+  }
+}
+
 function Get-Timestamp { (Get-Date -Format 'HH:mm:ss') }
 function Write-Info($msg) { $ts = Get-Timestamp; Write-Host "[INFO $ts] $msg" -ForegroundColor Cyan }
 function Write-Ok($msg) { $ts = Get-Timestamp; Write-Host "[OK   $ts] $msg" -ForegroundColor Green }
@@ -471,7 +491,25 @@ try {
     }
     if (-not $r2Url -and $UpdateUrl) {
       try {
-        $resp = Invoke-RestMethod -Uri $UpdateUrl -Method GET -TimeoutSec 30 -Headers @{ Accept = 'application/json' }
+        $resp = $null
+        if ($UpdateUrl -match '^(https?://)') {
+          $resp = Invoke-RestMethod -Uri $UpdateUrl -Method GET -TimeoutSec 30 -Headers @{ Accept = 'application/json' }
+        }
+        else {
+          # Local file path support for updates.json
+          $localPath = $UpdateUrl
+          if (-not (Test-Path $localPath) -and $PSScriptRoot) {
+            # Try relative to repo root
+            try {
+              $repoRoot = Split-Path -Parent $PSScriptRoot
+              $localPath = Join-Path $repoRoot $UpdateUrl
+            } catch {}
+          }
+          if (Test-Path $localPath) {
+            $raw = Get-Content $localPath -Raw
+            $resp = $raw | ConvertFrom-Json
+          }
+        }
         if ($resp -and $resp.androidApkUrl) { $r2Url = [string]$resp.androidApkUrl }
       } catch {}
     }
@@ -496,6 +534,40 @@ try {
   }
   if ($summary.r2_apk_url) {
     Write-Ok ("Cloudflare R2 APK URL: " + $summary.r2_apk_url)
+
+    # Consistency check: updates.json androidApkUrl vs detected R2 URL
+    try {
+      if ($UpdateUrl) {
+        $updates = $null
+        if ($UpdateUrl -match '^(https?://)') {
+          $updates = Invoke-RestMethod -Uri $UpdateUrl -Method GET -TimeoutSec 30 -Headers @{ Accept = 'application/json' }
+        }
+        else {
+          $path = $UpdateUrl
+          if (-not (Test-Path $path) -and $PSScriptRoot) {
+            try { $path = Join-Path (Split-Path -Parent $PSScriptRoot) $UpdateUrl } catch {}
+          }
+          if (Test-Path $path) { $updates = (Get-Content $path -Raw) | ConvertFrom-Json }
+        }
+        if ($updates -and $updates.androidApkUrl) {
+          $apkInJson = [string]$updates.androidApkUrl
+          if ($apkInJson -eq $summary.r2_apk_url) {
+            Write-Ok 'updates.json androidApkUrl matches detected R2 URL'
+          }
+          else {
+            Write-Warn 'updates.json androidApkUrl does NOT match detected R2 URL'
+            Write-Info ('updates.json: ' + $apkInJson)
+            Write-Info ('detected:    ' + $summary.r2_apk_url)
+          }
+        }
+        else {
+          Write-Warn 'Consistency check skipped: androidApkUrl missing or updates.json not readable'
+        }
+      }
+    }
+    catch {
+      Write-Warn ('Consistency check failed: ' + $_.Exception.Message)
+    }
   }
   Write-Ok ("Final: " + $summary.status + " / " + $summary.conclusion)
   if ($jobs) {

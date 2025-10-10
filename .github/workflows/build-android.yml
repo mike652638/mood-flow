@@ -686,6 +686,9 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     needs: build-android
     runs-on: ubuntu-latest
+    env:
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      R2_PUBLIC_BASE: ${{ secrets.R2_PUBLIC_BASE }}
     steps:
       - name: Download APK artifacts
         uses: actions/download-artifact@v4
@@ -721,3 +724,22 @@ jobs:
             dist/meta/**
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Print R2 APK URL (notice)
+        shell: bash
+        run: |
+          set -e
+          APK_FILE=$(ls -1 dist/apk/mood-flow-*-store-*.apk | tail -n1 || true)
+          if [ -z "$APK_FILE" ]; then
+            APK_FILE=$(ls -1 dist/apk/mood-flow-*-release-*.apk | tail -n1 || true)
+          fi
+          if [ -n "$APK_FILE" ]; then
+            BASENAME=$(basename "$APK_FILE")
+            if [ -n "${R2_PUBLIC_BASE}" ]; then
+              URL="${R2_PUBLIC_BASE}/releases/${BASENAME}"
+            else
+              URL="https://${R2_BUCKET}.r2.dev/releases/${BASENAME}"
+            fi
+            echo "::notice title=R2 APK URL::${URL}"
+          else
+            echo "No APK found to construct R2 URL" >&2
+          fi
