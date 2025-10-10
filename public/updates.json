@@ -2,6 +2,16 @@
   "latestVersion": "1.1.96",
   "androidApkUrl": "https://pub-0bd3064e8b4743b19a2219ed6f880902.r2.dev/releases/mood-flow-1.1.96-store-202510090413-r23-g04f2111.apk",
   "releaseNotes": "修复若干已知问题，优化沉浸模式标题安全区，提升稳定性。",
+  "changelog": {
+    "highlights": [
+      "优化沉浸模式标题安全区",
+      "修复若干已知问题，提升稳定性"
+    ],
+    "items": [
+      "修复旧版本更新源回退逻辑，提升远程检测准确性",
+      "优化 UI 细节与性能稳定性"
+    ]
+  },
   "mandatory": false,
   "publishedAt": "2025-10-09"
 }

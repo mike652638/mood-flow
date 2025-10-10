@@ -31,7 +31,23 @@ function updateJson(opts) {
   if (opts.version) json.latestVersion = opts.version;
   if (typeof opts.mandatory === 'boolean') json.mandatory = opts.mandatory;
   json.publishedAt = opts.publishedAt || todayISO();
-  if (opts.notes) json.releaseNotes = opts.notes;
+  if (opts.notes) {
+    json.releaseNotes = opts.notes;
+    // 补充结构化变更日志，便于客户端更友好地展示更新内容
+    // 规则：若存在 notes，则将其作为 highlights 的第一项；保留已存在的 changelog 结构
+    const initChangelog = () => ({ highlights: [], items: [] });
+    if (!json.changelog || typeof json.changelog !== 'object') {
+      json.changelog = initChangelog();
+    } else {
+      // 确保字段存在且类型正确
+      if (!Array.isArray(json.changelog.highlights)) json.changelog.highlights = [];
+      if (!Array.isArray(json.changelog.items)) json.changelog.items = [];
+    }
+    const note = String(opts.notes).trim();
+    if (note && !json.changelog.highlights.includes(note)) {
+      json.changelog.highlights.unshift(note);
+    }
+  }
 
   const out = JSON.stringify(json, null, 2) + '\n';
   fs.writeFileSync(file, out, 'utf8');
