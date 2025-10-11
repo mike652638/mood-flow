@@ -8,6 +8,40 @@
       {
         "label": "off"
       }
+    ],
+    "axe/aria": [
+      "default",
+      {
+        "aria-valid-attr-value": "off"
+      }
+    ],
+    "no-inline-styles": "off",
+    "compat-api/css": [
+      "default",
+      {
+        "ignore": [
+          "scrollbar-width"
+        ]
+      }
+    ],
+    "axe/structure": [
+      "default",
+      {
+        "listitem": "off"
+      }
     ]
-  }
+  },
+  "browserslist": [
+    "defaults",
+    "not ie 11",
+    "not and_chr <= 138",
+    "not and_ff <= 140",
+    "not chrome <= 139",
+    "not edge <= 138",
+    "not firefox <= 141",
+    "not ios_saf <= 18.6",
+    "not opera <= 117",
+    "not safari <= 18.6",
+    "not samsung <= 28"
+  ]
 }

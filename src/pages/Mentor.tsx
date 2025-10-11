@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { MessageSquare, ShieldAlert, Send, Fingerprint } from 'lucide-react';
 import { toast } from 'sonner';
+import ReactMarkdown from 'react-markdown';
 import Card from '../components/Card';
 import Container from '../components/Container';
 import Header from '../components/Header';
@@ -43,20 +44,44 @@ interface ChatBubble {
   streamStartAt?: number;
 }
 
+// 智能判断是否显示练习按钮的函数
+const shouldShowExerciseButton = (content: string, exerciseType: 'breathing' | 'reframe' | 'grounding'): boolean => {
+  switch (exerciseType) {
+    case 'breathing':
+      return /呼吸|焦虑|紧张|压力|放松|冷静|深呼吸|breathing|anxiety|stress|relax|calm/i.test(content);
+    case 'reframe':
+      return /想法|思维|认知|重构|负面|消极|思考|perspective|thought|cognitive|reframe|negative/i.test(content);
+    case 'grounding':
+      return /感官|当下|专注|注意力|锚定|grounding|present|focus|attention|mindful/i.test(content);
+    default:
+      return false;
+  }
+};
+
 const MessageItem = React.memo(
   ({
     m,
     hasConversation,
     onStartBreath,
     onStartReframe,
-    onStartGrounding
+    onStartGrounding,
+    onCopyMessage,
+    onRegenerateMessage,
+    hoveredMessageId,
+    onMessageHover
   }: {
     m: ChatBubble;
     hasConversation: boolean;
     onStartBreath: (seconds: number, pace: { inhale: number; hold: number; exhale: number }) => void;
     onStartReframe: () => void;
     onStartGrounding: (initial: number) => void;
+    onCopyMessage?: (content: string) => void;
+    onRegenerateMessage?: (messageId: string) => void;
+    hoveredMessageId?: string | null;
+    onMessageHover?: (messageId: string | null) => void;
   }) => {
+    const isHovered = hoveredMessageId === m.id;
+    
     return (
       <div
         className={
@@ -65,65 +90,144 @@ const MessageItem = React.memo(
                 hasConversation
                   ? 'max-w-full sm:max-w-[90%] md:max-w-[85%] lg:max-w-[80%] xl:max-w-[75%] 2xl:max-w-[70%]'
                   : 'max-w-full sm:max-w-[96%] md:max-w-[94%] lg:max-w-[92%] xl:max-w-[90%] 2xl:max-w-[88%]'
-              } bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-theme-gray-700/60 ring-1 ring-white/25 dark:ring-theme-gray-700/60 rounded-2xl p-3 shadow-sm dark:shadow-none`
+              } bg-gradient-to-br from-purple-50 to-purple-100/80 dark:from-purple-900/20 dark:to-purple-800/10 border border-purple-200/80 dark:border-purple-700/40 ring-1 ring-purple-100/50 dark:ring-purple-700/30 rounded-2xl p-3 shadow-md hover:shadow-lg dark:shadow-purple-900/10 transition-all duration-300 animate-in slide-in-from-left-2 fade-in-0 relative group`
             : `ml-auto ${
                 hasConversation
                   ? 'max-w-full sm:max-w-[90%] md:max-w-[85%] lg:max-w-[80%] xl:max-w-[75%] 2xl:max-w-[70%]'
                   : 'max-w-full sm:max-w-[96%] md:max-w-[94%] lg:max-w-[92%] xl:max-w-[90%] 2xl:max-w-[88%]'
-              } bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-theme-gray-700/60 ring-1 ring-white/25 dark:ring-theme-gray-700/60 rounded-2xl p-3 shadow-sm dark:shadow-none`
-        }>
-        <div className='text-sm sm:text-base lg:text-lg text-gray-800 dark:text-gray-200'>
-          {m.content.split(/\n\n+/).map((seg, i) => (
-            <p key={i} className='mb-2 whitespace-pre-wrap leading-relaxed xl:leading-loose'>
-              {seg}
-            </p>
-          ))}
-        </div>
-        {m.streaming && (
-          <div className='mt-2 text-xs sm:text-sm text-gray-400 dark:text-gray-500'>
-            正在生成...{' '}
-            {(() => {
-              const target = 800;
-              const start = m.streamStartAt ?? Date.now();
-              const elapsedSec = Math.max(1, (Date.now() - start) / 1000);
-              const rate = Math.max(8, m.content.length / elapsedSec);
-              const remainingChars = Math.max(0, target - m.content.length);
-              const estSec = Math.round(remainingChars / rate);
-              const mm = Math.floor(estSec / 60);
-              const ss = estSec % 60;
-              return `预计剩余 ${mm > 0 ? `${mm}分${ss}秒` : `${ss}秒`}`;
-            })()}
+              } bg-gradient-to-br from-blue-50 to-blue-100/80 dark:from-blue-900/20 dark:to-blue-800/10 border border-blue-200/80 dark:border-blue-700/40 ring-1 ring-blue-100/50 dark:ring-blue-700/30 rounded-2xl p-3 shadow-md hover:shadow-lg dark:shadow-blue-900/10 transition-all duration-300 animate-in slide-in-from-right-2 fade-in-0 relative group`
+        }
+        onMouseEnter={() => onMessageHover?.(m.id)}
+        onMouseLeave={() => onMessageHover?.(null)}>
+        
+        {/* 消息操作按钮 */}
+        {(isHovered || hasConversation) && onCopyMessage && (
+          <div className='absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200'>
+            <button
+              onClick={() => onCopyMessage(m.content)}
+              className='p-1.5 rounded-lg bg-white/80 dark:bg-gray-800/80 hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-all duration-200 shadow-sm hover:shadow-md'
+              title='复制消息'>
+              <svg className='w-3.5 h-3.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z' />
+              </svg>
+            </button>
+            {m.role === 'assistant' && onRegenerateMessage && (
+              <button
+                onClick={() => onRegenerateMessage(m.id)}
+                className='p-1.5 rounded-lg bg-white/80 dark:bg-gray-800/80 hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-all duration-200 shadow-sm hover:shadow-md'
+                title='重新生成'>
+                <svg className='w-3.5 h-3.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15' />
+                </svg>
+              </button>
+            )}
           </div>
         )}
+        
+        <div className='text-sm sm:text-base lg:text-lg text-gray-800 dark:text-gray-200 prose prose-sm sm:prose-base lg:prose-lg dark:prose-invert max-w-none prose-p:mb-2 prose-p:leading-relaxed xl:prose-p:leading-loose prose-headings:mb-2 prose-headings:mt-3 prose-ul:mb-2 prose-ol:mb-2 prose-li:mb-1 prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-gray-100 dark:prose-pre:bg-gray-800 prose-pre:p-3 prose-pre:rounded-lg prose-blockquote:border-l-purple-500 prose-blockquote:bg-purple-50 dark:prose-blockquote:bg-purple-900/20 prose-blockquote:p-3 prose-blockquote:rounded-r-lg'>
+          <ReactMarkdown
+            components={{
+              p: ({ children }) => <p className='mb-2 whitespace-pre-wrap leading-relaxed xl:leading-loose'>{children}</p>,
+              code: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => {
+                const inline = props.inline;
+                return inline ? (
+                  <code className='bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm' {...props}>
+                    {children}
+                  </code>
+                ) : (
+                  <pre className='bg-gray-100 dark:bg-gray-800 p-3 rounded-lg overflow-x-auto'>
+                    <code {...props}>{children}</code>
+                  </pre>
+                );
+              },
+              ul: ({ children }) => <ul className='mb-2 pl-4'>{children}</ul>,
+              ol: ({ children }) => <ol className='mb-2 pl-4'>{children}</ol>,
+              li: ({ children }) => <li className='mb-1'>{children}</li>,
+              blockquote: ({ children }) => (
+                <blockquote className='border-l-4 border-purple-500 bg-purple-50 dark:bg-purple-900/20 p-3 rounded-r-lg mb-2'>
+                  {children}
+                </blockquote>
+              ),
+              h1: ({ children }) => <h1 className='text-xl font-bold mb-2 mt-3'>{children}</h1>,
+              h2: ({ children }) => <h2 className='text-lg font-bold mb-2 mt-3'>{children}</h2>,
+              h3: ({ children }) => <h3 className='text-base font-bold mb-2 mt-3'>{children}</h3>,
+            }}
+          >
+            {m.content}
+          </ReactMarkdown>
+        </div>
         {m.streaming && (
-          <div
-            className='mt-2 h-1.5 sm:h-2 w-20 sm:w-24 rounded-full bg-gray-200 dark:bg-theme-gray-700 animate-pulse motion-reduce:animate-none'
-            aria-hidden='true'
-            aria-busy='true'
-          />
+          <div className='mt-3 flex items-center gap-3 p-2 rounded-lg bg-purple-100/50 dark:bg-purple-900/30 border border-purple-200/50 dark:border-purple-700/50'>
+            <div className='flex items-center gap-2'>
+              <div className='flex space-x-1'>
+                <div className='w-2 h-2 bg-purple-500 rounded-full animate-bounce [animation-delay:-0.3s]'></div>
+                <div className='w-2 h-2 bg-purple-500 rounded-full animate-bounce [animation-delay:-0.15s]'></div>
+                <div className='w-2 h-2 bg-purple-500 rounded-full animate-bounce'></div>
+              </div>
+              <span className='text-xs sm:text-sm text-purple-700 dark:text-purple-300 font-medium'>
+                AI 正在思考...
+              </span>
+            </div>
+            <div className='flex-1 text-right'>
+              <span className='text-xs text-purple-600 dark:text-purple-400'>
+                {(() => {
+                  const target = 800;
+                  const start = m.streamStartAt ?? Date.now();
+                  const elapsedSec = Math.max(1, (Date.now() - start) / 1000);
+                  const rate = Math.max(8, m.content.length / elapsedSec);
+                  const remainingChars = Math.max(0, target - m.content.length);
+                  const estSec = Math.round(remainingChars / rate);
+                  const mm = Math.floor(estSec / 60);
+                  const ss = estSec % 60;
+                  return `预计剩余 ${mm > 0 ? `${mm}分${ss}秒` : `${ss}秒`}`;
+                })()}
+              </span>
+            </div>
+          </div>
         )}
-        {m.role === 'assistant' && (
+        {m.role === 'assistant' && !m.streaming && (
           <div className='mt-3 flex flex-wrap gap-2'>
-            <button
-              onClick={() => onStartBreath(180, { inhale: 4, hold: 4, exhale: 6 })}
-              className='h-8 sm:h-9 px-2 py-1 rounded-lg text-sm bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-800/40 text-blue-700 dark:text-blue-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-700 active:scale-95'>
-              呼吸练习 · 3分钟
-            </button>
-            <button
-              onClick={() => onStartBreath(300, { inhale: 5, hold: 5, exhale: 7 })}
-              className='h-8 sm:h-9 px-2 py-1 rounded-lg text-sm bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-800/40 text-blue-700 dark:text-blue-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-700 active:scale-95'>
-              呼吸练习 · 5分钟（慢）
-            </button>
-            <button
-              onClick={onStartReframe}
-              className='h-8 sm:h-9 px-2 py-1 rounded-lg text-sm bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-800/40 text-purple-700 dark:text-purple-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-700 active:scale-95'>
-              认知重构练习
-            </button>
-            <button
-              onClick={() => onStartGrounding(15)}
-              className='h-8 sm:h-9 px-2 py-1 rounded-lg text-sm bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 dark:hover:bg-emerald-800/40 text-emerald-700 dark:text-emerald-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-700 active:scale-95'>
-              锚定练习（每步15秒）
-            </button>
+            {/* 智能显示练习按钮 - 根据AI回复内容判断 */}
+            {shouldShowExerciseButton(m.content, 'breathing') && (
+              <>
+                <button
+                  onClick={() => onStartBreath(180, { inhale: 4, hold: 4, exhale: 6 })}
+                  className='group h-8 sm:h-9 px-3 py-1 rounded-lg text-sm bg-gradient-to-r from-blue-100 to-blue-50 dark:from-blue-900/30 dark:to-blue-800/20 hover:from-blue-200 hover:to-blue-100 dark:hover:from-blue-800/40 dark:hover:to-blue-700/30 text-blue-700 dark:text-blue-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-700 active:scale-95 border border-blue-200/50 dark:border-blue-700/30 shadow-sm hover:shadow-md'>
+                  <span className='flex items-center gap-1.5'>
+                    <div className='w-2 h-2 rounded-full bg-blue-500 group-hover:animate-pulse'></div>
+                    呼吸练习 · 3分钟
+                  </span>
+                </button>
+                <button
+                  onClick={() => onStartBreath(300, { inhale: 5, hold: 5, exhale: 7 })}
+                  className='group h-8 sm:h-9 px-3 py-1 rounded-lg text-sm bg-gradient-to-r from-blue-100 to-blue-50 dark:from-blue-900/30 dark:to-blue-800/20 hover:from-blue-200 hover:to-blue-100 dark:hover:from-blue-800/40 dark:hover:to-blue-700/30 text-blue-700 dark:text-blue-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-700 active:scale-95 border border-blue-200/50 dark:border-blue-700/30 shadow-sm hover:shadow-md'>
+                  <span className='flex items-center gap-1.5'>
+                    <div className='w-2 h-2 rounded-full bg-blue-500 group-hover:animate-pulse'></div>
+                    呼吸练习 · 5分钟（慢）
+                  </span>
+                </button>
+              </>
+            )}
+            {shouldShowExerciseButton(m.content, 'reframe') && (
+              <button
+                onClick={onStartReframe}
+                className='group h-8 sm:h-9 px-3 py-1 rounded-lg text-sm bg-gradient-to-r from-purple-100 to-purple-50 dark:from-purple-900/30 dark:to-purple-800/20 hover:from-purple-200 hover:to-purple-100 dark:hover:from-purple-800/40 dark:hover:to-purple-700/30 text-purple-700 dark:text-purple-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-700 active:scale-95 border border-purple-200/50 dark:border-purple-700/30 shadow-sm hover:shadow-md'>
+                <span className='flex items-center gap-1.5'>
+                  <div className='w-2 h-2 rounded-full bg-purple-500 group-hover:animate-pulse'></div>
+                  认知重构练习
+                </span>
+              </button>
+            )}
+            {shouldShowExerciseButton(m.content, 'grounding') && (
+              <button
+                onClick={() => onStartGrounding(15)}
+                className='group h-8 sm:h-9 px-3 py-1 rounded-lg text-sm bg-gradient-to-r from-emerald-100 to-emerald-50 dark:from-emerald-900/30 dark:to-emerald-800/20 hover:from-emerald-200 hover:to-emerald-100 dark:hover:from-emerald-800/40 dark:hover:to-emerald-700/30 text-emerald-700 dark:text-emerald-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-700 active:scale-95 border border-emerald-200/50 dark:border-emerald-700/30 shadow-sm hover:shadow-md'>
+                <span className='flex items-center gap-1.5'>
+                  <div className='w-2 h-2 rounded-full bg-emerald-500 group-hover:animate-pulse'></div>
+                  锚定练习（每步15秒）
+                </span>
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -487,7 +591,7 @@ const CognitiveReframe: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     }
   };
 
-  return (
+ return (
     <Modal
       title='认知重构练习'
       onClose={onClose}
@@ -792,6 +896,62 @@ const Mentor: React.FC = () => {
   const [showEmotionJournal, setShowEmotionJournal] = useState(false);
   const [input, setInput] = useState('');
   // 统一改用 Toast 提示，无需额外输入提示状态
+  // 移动端软键盘优化
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const currentHeight = window.innerHeight;
+      const heightDiff = viewportHeight - currentHeight;
+      
+      // 如果高度减少超过150px，认为是软键盘弹出
+      if (heightDiff > 150) {
+        setIsKeyboardOpen(true);
+      } else {
+        setIsKeyboardOpen(false);
+      }
+      
+      setViewportHeight(currentHeight);
+    };
+
+    const handleVisualViewportChange = () => {
+      if (window.visualViewport) {
+        const heightDiff = window.innerHeight - window.visualViewport.height;
+        setIsKeyboardOpen(heightDiff > 150);
+      }
+    };
+
+    // 监听窗口大小变化
+    window.addEventListener('resize', handleResize);
+    
+    // 监听Visual Viewport API（更准确的软键盘检测）
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleVisualViewportChange);
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleVisualViewportChange);
+      }
+    };
+  }, [viewportHeight]);
+
+  // 输入框获得焦点时的处理
+  const handleInputFocus = useCallback(() => {
+    // 延迟滚动，等待软键盘完全弹出
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center',
+          inline: 'nearest'
+        });
+      }
+    }, 300);
+  }, []);
+
   const [abortCtrl, setAbortCtrl] = useState<AbortController | null>(null);
   const [_progress, setProgress] = useState(0);
   const [_sendStartAt, setSendStartAt] = useState<number | null>(null);
@@ -924,6 +1084,17 @@ const Mentor: React.FC = () => {
     if (hasConversation && !hasStoredPreference) setPresetOpen(false);
   }, [hasConversation, hasStoredPreference]);
 
+  // 自动滚动到对话区底部
+  const scrollToBottom = useCallback(() => {
+    setTimeout(() => {
+      const el = scrollRef.current;
+      if (el) {
+        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+        setAtBottom(true);
+      }
+    }, 100);
+  }, []);
+
   const onSend = async () => {
     const text = input.trim();
     if (isSending) return;
@@ -945,6 +1116,9 @@ const Mentor: React.FC = () => {
       { id: `a-${Date.now()}`, role: 'assistant', content: '', streaming: true, streamStartAt: Date.now() }
     ]);
     setInput('');
+
+    // 发送消息后自动滚动到对话区
+    scrollToBottom();
 
     const history: { role: 'user' | 'assistant' | 'system'; content: string }[] = messages.map(m => ({
       role: m.role,
@@ -981,6 +1155,8 @@ const Mentor: React.FC = () => {
         }
         // 结束流式
         setMessages(prev => prev.map(m => (m.streaming ? { ...m, streaming: false } : m)));
+        // AI回复完成后再次滚动到底部
+        scrollToBottom();
       } catch (_e) {
         // 处理中断
         setLastError(String(_e));
@@ -991,6 +1167,8 @@ const Mentor: React.FC = () => {
       if ('content' in gen) {
         const res = gen as { content: string };
         setMessages(prev => prev.map(m => (m.streaming ? { ...m, streaming: false, content: res.content } : m)));
+        // 非流式回复完成后滚动到底部
+        scrollToBottom();
       }
     }
     setIsSending(false);
@@ -1019,6 +1197,9 @@ const Mentor: React.FC = () => {
       { id: `a-${Date.now()}`, role: 'assistant', content: '', streaming: true, streamStartAt: Date.now() }
     ]);
 
+    // 点击预设问题后自动滚动到对话区
+    scrollToBottom();
+
     const history: { role: 'user' | 'assistant' | 'system'; content: string }[] = messages.map(m => ({
       role: m.role,
       content: m.content
@@ -1054,6 +1235,8 @@ const Mentor: React.FC = () => {
         }
         // 结束流式
         setMessages(prev => prev.map(m => (m.streaming ? { ...m, streaming: false } : m)));
+        // AI回复完成后滚动到底部
+        scrollToBottom();
       } catch (_e) {
         // 处理中断
         setLastError(String(_e));
@@ -1064,6 +1247,8 @@ const Mentor: React.FC = () => {
       if ('content' in gen) {
         const res = gen as { content: string };
         setMessages(prev => prev.map(m => (m.streaming ? { ...m, streaming: false, content: res.content } : m)));
+        // 非流式回复完成后滚动到底部
+        scrollToBottom();
       }
     }
     setIsSending(false);
@@ -1084,10 +1269,62 @@ const Mentor: React.FC = () => {
     el.style.height = `${Math.min(el.scrollHeight, max)}px`;
   };
 
+  // 自动聚焦输入框
+  useEffect(() => {
+    if (activeTab === 'chat' && !isSending && inputRef.current) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, isSending, messages.length]);
+
+  // 消息操作功能
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+  
+  const copyMessage = (content: string) => {
+    navigator.clipboard.writeText(content).then(() => {
+      // 可以添加一个简单的提示
+      console.log('消息已复制到剪贴板');
+    });
+  };
+
+  const regenerateMessage = (messageId: string) => {
+    const messageIndex = messages.findIndex(m => m.id === messageId);
+    if (messageIndex === -1) return;
+    
+    // 找到对应的用户消息
+    const userMessage = messages[messageIndex - 1];
+    if (userMessage && userMessage.role === 'user') {
+      // 删除从助手消息开始的所有后续消息
+      const newMessages = messages.slice(0, messageIndex);
+      setMessages(newMessages);
+      
+      // 重新发送用户消息
+      setInput(userMessage.content);
+      setTimeout(() => onSend(), 100);
+    }
+  };
+
+  // 输入框快捷键处理
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey && !isSending) {
+      e.preventDefault();
+      onSend();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      if (isSending) {
+        stopStreaming();
+      } else {
+        setInput('');
+      }
+    }
+  };
+
   return (
     <>
       <Header title='AI 情绪疏导师' immersiveMode={immersiveMode} />
-      <Container className='pb-0'>
+      <Container className='pb-0 page-container'>
         <div className='page-sections space-y-6'>
           {/* 标签页导航（对齐设置页样式） */}
           <Card variant='default' padding='sm' className='overflow-hidden p-2 sm:p-3'>
@@ -1386,9 +1623,9 @@ const Mentor: React.FC = () => {
                 aria-busy={isSending || messages.some(m => m.streaming)}
                 className={
                   (hasConversation
-                    ? 'h-[55svh] sm:h-[60svh] lg:h-[62svh] xl:h-[56svh] 2xl:h-[52svh] overflow-y-auto overscroll-y-contain'
+                    ? 'h-[55svh] sm:h-[60svh] lg:h-[62svh] xl:h-[56svh] 2xl:h-[52svh] overflow-y-auto overscroll-y-contain chat-scroll-container'
                     : 'h-auto max-h-[40vh] overflow-y-visible flex items-center justify-center px-2 sm:px-3 lg:px-4 xl:px-6') +
-                  ' pr-1 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent'
+                  ' pr-1 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent scroll-container'
                 }>
                 {hasConversation ? (
                   <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
@@ -1418,6 +1655,10 @@ const Mentor: React.FC = () => {
                               setGroundingInitial(initial);
                               setShowGrounding(true);
                             }}
+                            onCopyMessage={copyMessage}
+                            onRegenerateMessage={regenerateMessage}
+                            hoveredMessageId={hoveredMessageId}
+                            onMessageHover={setHoveredMessageId}
                           />
                         </div>
                       </div>
@@ -1438,6 +1679,10 @@ const Mentor: React.FC = () => {
                         setGroundingInitial(initial);
                         setShowGrounding(true);
                       }}
+                      onCopyMessage={copyMessage}
+                      onRegenerateMessage={regenerateMessage}
+                      hoveredMessageId={hoveredMessageId}
+                      onMessageHover={setHoveredMessageId}
                     />
                   ))
                 )}
@@ -1467,26 +1712,37 @@ const Mentor: React.FC = () => {
             
 
             <div className='flex flex-col sm:flex-row items-stretch sm:items-center'>
-              <Card variant='default' padding='sm' className='flex-1 min-w-0 order-1 sm:order-none'>
-                <textarea
-                  ref={inputRef}
-                  rows={2}
-                  value={input}
-                  onChange={e => {
-                    const v = e.target.value;
-                    setInput(v);
-                    adjustInputHeight();
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && !e.shiftKey && !isSending) {
-                      e.preventDefault();
-                      onSend();
-                    }
-                  }}
-                  placeholder='分享你的想法、感受，或任何想说的话...'
-                  className='w-full bg-white/80 dark:bg-gray-800/90 outline-none text-sm xl:text-base placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-600 rounded-md px-3 py-2 xl:px-4 xl:py-3 transition-all duration-200 border border-gray-200 dark:border-gray-700 shadow-sm focus:shadow-md resize-none overflow-y-auto min-h-[64px] max-h-[240px]'
-                  disabled={isSending}
-                />
+              <Card variant='default' padding='sm' className='flex-1 min-w-0 order-1 sm:order-none relative'>
+                <div className='relative'>
+                  <textarea
+                    ref={inputRef}
+                    rows={2}
+                    value={input}
+                    onChange={e => {
+                      const v = e.target.value;
+                      setInput(v);
+                      adjustInputHeight();
+                    }}
+                    onKeyDown={handleKeyDown}
+                    onFocus={handleInputFocus}
+                    placeholder='分享你的想法、感受，或任何想说的话...'
+                    className={`w-full bg-white/80 dark:bg-gray-800/90 outline-none text-sm xl:text-base placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-600 rounded-md px-3 py-2 xl:px-4 xl:py-3 transition-all duration-200 border border-gray-200 dark:border-gray-700 shadow-sm focus:shadow-md resize-none overflow-y-auto min-h-[64px] max-h-[240px] pr-12 ${isKeyboardOpen ? 'fixed-input' : ''}`}
+                    disabled={isSending}
+                  />
+                  {/* 输入提示 */}
+                  {!input && !isSending && (
+                    <div className='absolute bottom-2 right-2 text-xs text-gray-400 dark:text-gray-500 pointer-events-none'>
+                      <span className='hidden sm:inline'>Enter 发送 • Shift+Enter 换行 • Esc 清空</span>
+                      <span className='sm:hidden'>点击发送</span>
+                    </div>
+                  )}
+                  {/* 字数统计 */}
+                  {input.length > 0 && (
+                    <div className='absolute top-2 right-2 text-xs text-gray-400 dark:text-gray-500 bg-white/80 dark:bg-gray-800/80 px-2 py-1 rounded backdrop-blur-sm'>
+                      {input.length}/2000
+                    </div>
+                  )}
+                </div>
                 {/* 输入区操作按钮：左侧“停止/重试”，右侧“发送”；移动端堆叠显示 */}
                 <div className='mt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3' style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
                   <div className='flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full'>
@@ -1540,48 +1796,62 @@ const Mentor: React.FC = () => {
             </div>
 
             {/* 预设问题：输入框下方常驻，可折叠，分组展示 */}
-            <Card variant='default' padding='sm' className='overflow-hidden'>
+            <Card variant='default' padding='sm' className='overflow-hidden border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 shadow-sm hover:shadow-md transition-all duration-300'>
               <div className='flex items-center justify-between'>
-                <div className='text-sm sm:text-base text-gray-600 dark:text-gray-300'>试试这些问题：</div>
+                <div className='flex items-center gap-2'>
+                  <span className='text-lg'>💭</span>
+                  <div className='text-sm sm:text-base font-medium text-gray-700 dark:text-gray-300'>快速开始对话</div>
+                </div>
                 <button
                   onClick={() => setPresetOpen(prev => !prev)}
                   aria-expanded={presetOpen}
-                  className='text-sm px-2 py-1 rounded-md bg-gray-100 dark:bg-theme-gray-800 text-gray-600 dark:text-gray-300'>
+                  className='flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-all duration-200 font-medium'>
                   {presetOpen ? '收起' : '展开'}
+                  <span className={cn('transition-transform duration-200', presetOpen ? 'rotate-180' : '')}>
+                    ▼
+                  </span>
                 </button>
               </div>
               <div
                 className={cn(
-                  'mt-2 sm:mt-3 transition-all duration-300 ease-in-out overflow-hidden',
+                  'mt-3 transition-all duration-300 ease-in-out overflow-hidden',
                   presetOpen ? 'max-h-[900px] opacity-100' : 'max-h-0 opacity-0'
                 )}
                 aria-hidden={!presetOpen}>
-                <div className='grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 sm:gap-3 xl:gap-4 2xl:gap-5'>
+                <div className='grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4'>
                   {presetGroups.map(group => (
-                    <div key={group.label} className='rounded-lg p-2 sm:p-3 xl:p-4'>
-                      <div className='flex items-center gap-1.5 mb-1'>
+                    <div key={group.label} className='rounded-xl p-3 sm:p-4 bg-white/60 dark:bg-gray-700/60 border border-gray-200 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600 transition-all duration-200 shadow-sm hover:shadow-md'>
+                      <div className='flex items-center gap-2 mb-3 pb-2 border-b border-gray-200 dark:border-gray-600'>
                         <span
                           className={cn(
-                            'inline-flex items-center justify-center w-5 h-5 xl:w-6 xl:h-6 rounded-md text-[13px] xl:text-sm select-none',
+                            'inline-flex items-center justify-center w-6 h-6 rounded-lg text-sm select-none shadow-sm',
                             group.accentClasses.bg,
                             group.accentClasses.text
                           )}>
                           {group.icon}
                         </span>
-                        <span className={cn('text-sm xl:text-base font-semibold', group.accentClasses.text)}>
+                        <span className={cn('text-sm font-semibold', group.accentClasses.text)}>
                           {group.label}
                         </span>
                       </div>
                       <div
                         role='group'
                         aria-label={`${group.label} 预设问题`}
-                        className='flex flex-wrap gap-1.5 sm:gap-2 xl:gap-2.5'>
+                        className='space-y-2'>
                         {group.items.map((q, idx) => (
                           <button
                             key={idx}
                             onClick={() => sendPreset(q)}
-                            className='h-8 sm:h-9 xl:h-10 px-2 xl:px-3 py-1 rounded-lg text-sm xl:text-base bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-600 active:scale-95'>
-                            {q}
+                            disabled={isSending}
+                            className='w-full text-left p-2.5 rounded-lg text-sm bg-white/80 dark:bg-gray-600/80 hover:bg-purple-50 dark:hover:bg-purple-900/30 text-gray-700 dark:text-gray-300 hover:text-purple-700 dark:hover:text-purple-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-600 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed border border-gray-200 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600 shadow-sm hover:shadow-md group'>
+                            <div className='flex items-start gap-2'>
+                              <span className='text-purple-500 dark:text-purple-400 mt-0.5 group-hover:scale-110 transition-transform duration-200'>
+                                💬
+                              </span>
+                              <span className='flex-1 leading-relaxed'>
+                                {q}
+                              </span>
+                            </div>
                           </button>
                         ))}
                       </div>

@@ -34,6 +34,74 @@ select {
   font-size: 16px; /* 防止 iOS 缩放 */
 }
 
+/* 移动端软键盘优化 */
+.fixed-input {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 1000 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-bottom: none !important;
+}
+
+/* 软键盘弹出时的页面适配 */
+@supports (height: 100dvh) {
+  .keyboard-adaptive {
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+}
+
+/* 滚动边界优化 */
+.scroll-container {
+  /* 防止过度滚动 */
+  overscroll-behavior: contain;
+  /* iOS 滚动优化 */
+  -webkit-overflow-scrolling: touch;
+  /* 滚动条样式 */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
+.scroll-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-container::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
+}
+
+.scroll-container::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.7);
+}
+
+/* 移动端触摸滚动边界优化 */
+@media (max-width: 768px) {
+  .chat-scroll-container {
+    /* 防止滚动穿透到父容器 */
+    overscroll-behavior-y: contain;
+    /* 优化触摸滚动性能 */
+    -webkit-overflow-scrolling: touch;
+    /* 防止橡皮筋效果 */
+    overscroll-behavior: none;
+  }
+  
+  /* 页面主容器滚动优化 */
+  .page-container {
+    overscroll-behavior-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 /* 滚动优化 */
 .scroll-smooth {
   scroll-behavior: smooth;
