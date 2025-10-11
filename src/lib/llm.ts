@@ -12,31 +12,37 @@ declare global {
       DEEPSEEK_API_KEY?: string;
       DEEPSEEK_MODEL?: string;
     };
+    Capacitor?: {
+      isNativePlatform?: () => boolean;
+    };
   }
 }
 
 const getRuntime = () => window.__RUNTIME_CONFIG__ || {};
 
-// 运行时读取配置，避免打包时环境变量缺失导致原生端不可用
-const getBaseUrl = (): string =>
-  getRuntime().DEEPSEEK_BASE_URL || import.meta.env.VITE_DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
+// 获取配置值的函数，添加调试信息
+const getConfig = () => {
+  const runtime = getRuntime();
+  const envApiKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
+  const envBaseUrl = import.meta.env.VITE_DEEPSEEK_BASE_URL;
+  const envModel = import.meta.env.VITE_DEEPSEEK_MODEL;
 
-const getModel = (): string => getRuntime().DEEPSEEK_MODEL || import.meta.env.VITE_DEEPSEEK_MODEL || 'deepseek-chat';
-
-// 优先使用运行时注入/打包环境变量；在移动端或未注入时，回退到 localStorage
-const getApiKey = (): string => {
-  const injected = getRuntime().DEEPSEEK_API_KEY || import.meta.env.VITE_DEEPSEEK_API_KEY || '';
-  if (injected) return injected;
-  try {
-    // 兼容不同命名键（支持 Vite 前缀）
-    return (
-      localStorage.getItem('VITE_DEEPSEEK_API_KEY') ||
-      localStorage.getItem('DEEPSEEK_API_KEY') ||
-      ''
-    );
-  } catch {
-    return '';
+  // 在开发环境下输出调试信息
+  if (import.meta.env.DEV) {
+    console.log('[DeepSeek Config Debug]', {
+      runtime: runtime,
+      envApiKey: envApiKey ? `${envApiKey.substring(0, 8)}...` : 'undefined',
+      envBaseUrl: envBaseUrl,
+      envModel: envModel,
+      isNative: typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.()
+    });
   }
+
+  return {
+    BASE_URL: runtime.DEEPSEEK_BASE_URL || envBaseUrl || 'https://api.deepseek.com',
+    API_KEY: runtime.DEEPSEEK_API_KEY || envApiKey || '',
+    MODEL: runtime.DEEPSEEK_MODEL || envModel || 'deepseek-chat'
+  };
 };
 
 export interface ChatOptions {
@@ -59,27 +65,33 @@ export async function deepseekChat(
   messages: ChatMessage[],
   options: ChatOptions = {}
 ): Promise<ChatResult | AsyncGenerator<string>> {
-  const API_KEY = getApiKey();
-  const BASE_URL = getBaseUrl();
-  const MODEL = getModel();
-  if (!API_KEY) {
-    throw new Error(
-      'DeepSeek API Key 未配置。请在 .env.* 中设置 VITE_DEEPSEEK_API_KEY，或前往“设置 → 应用设置 → AI 服务配置”保存密钥以在移动端生效'
-    );
+  // 动态获取最新配置，确保在移动端环境中能正确读取
+  const currentConfig = getConfig();
+
+  if (!currentConfig.API_KEY) {
+    const errorMsg = `DeepSeek API Key 未配置。请在 .env.local 中设置 VITE_DEEPSEEK_API_KEY
+    
+调试信息：
+- 运行环境: ${typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.() ? '移动端原生' : 'Web浏览器'}
+- 配置来源: ${window.__RUNTIME_CONFIG__ ? '运行时配置' : '环境变量'}
+- API Key 状态: ${currentConfig.API_KEY ? '已配置' : '未配置'}`;
+
+    console.error('[DeepSeek API Error]', errorMsg);
+    throw new Error(errorMsg);
   }
 
   const body = {
-    model: MODEL,
+    model: currentConfig.MODEL,
     messages: buildMessages(messages, options.systemPrompt),
     stream: !!options.stream,
     temperature: options.temperature ?? 0.7,
     max_tokens: options.max_tokens ?? 512
   };
 
-  const url = `${BASE_URL}/chat/completions`;
+  const url = `${currentConfig.BASE_URL}/chat/completions`;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${API_KEY}`
+    Authorization: `Bearer ${currentConfig.API_KEY}`
   };
 
   if (options.stream) {
@@ -165,11 +177,7 @@ function buildMessages(messages: ChatMessage[], systemPrompt?: string) {
 }
 
 // 提示工程模板：个性化约束与输出要求
-export function buildMentorSystemPrompt(params: {
-  avg7d: number;
-  mostMood: string;
-  todayCount: number;
-}): string {
+export function buildMentorSystemPrompt(params: { avg7d: number; mostMood: string; todayCount: number }): string {
   return [
     '你是一位温暖、稳重的 AI 情绪疏导师。',
     '请遵循：',

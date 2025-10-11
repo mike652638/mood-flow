@@ -1,22 +1,29 @@
 ﻿{
     "ok":  true,
-    "tag":  "v1.2.11",
+    "tag":  "v1.2.12",
     "branch":  "main",
-    "head_sha":  "e02e1698cb32ccaa590ef0145afcc0d60f20b987",
-    "run_id":  18413745751,
-    "run_number":  97,
-    "status":  "in_progress",
-    "conclusion":  null,
-    "html_url":  "https://github.com/mike652638/mood-flow/actions/runs/18413745751",
+    "head_sha":  "3aac94c5250a0a0e55fb3b4f796cbad06081f81e",
+    "run_id":  18414281474,
+    "run_number":  98,
+    "status":  "completed",
+    "conclusion":  "success",
+    "html_url":  "https://github.com/mike652638/mood-flow/actions/runs/18414281474",
     "workflow_name":  "Build Android APK",
     "workflow_path":  ".github/workflows/build-android.yml",
-    "jobs":  {
-                 "status":  "in_progress",
-                 "name":  "build-android",
-                 "conclusion":  null
-             },
-    "release_url":  "https://github.com/mike652638/mood-flow/releases/tag/v1.2.11",
-    "r2_apk_url":  null,
+    "jobs":  [
+                 {
+                     "status":  "completed",
+                     "name":  "build-android",
+                     "conclusion":  "success"
+                 },
+                 {
+                     "status":  "completed",
+                     "name":  "publish-release",
+                     "conclusion":  "success"
+                 }
+             ],
+    "release_url":  "https://github.com/mike652638/mood-flow/releases/tag/v1.2.12",
+    "r2_apk_url":  "https://pub-0bd3064e8b4743b19a2219ed6f880902.r2.dev/releases/mood-flow-1.2.12-store-202510101755-r98-g3aac94c.apk",
     "apk_release_asset_url":  null,
-    "apk_source":  null
+    "apk_source":  "logs"
 }

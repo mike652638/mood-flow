@@ -65,84 +65,6 @@ interface AppSettings {
   dataEncryption: boolean; // 数据加密设置
   privacyMode: boolean; // 隐私模式设置
   autoCheckUpdate?: boolean; // 自动检查更新
-} 
-
-// DeepSeek API Key 运行时配置表单（保存到 localStorage，移动端生效）
-function DeepseekKeyForm() {
-  const [key, setKey] = useState('');
-  const [show, setShow] = useState(false);
-
-  useEffect(() => {
-    try {
-      const k =
-        localStorage.getItem('VITE_DEEPSEEK_API_KEY') || localStorage.getItem('DEEPSEEK_API_KEY') || '';
-      setKey(k);
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  const save = () => {
-    const v = key.trim();
-    try {
-      localStorage.setItem('VITE_DEEPSEEK_API_KEY', v);
-      toast.success('DeepSeek API Key 已保存（原生端将使用该配置）');
-    } catch (e) {
-      console.error('保存 DeepSeek API Key 失败', e);
-      toast.error('保存失败，请检查存储权限');
-    }
-  };
-
-  const clear = () => {
-    try {
-      localStorage.removeItem('VITE_DEEPSEEK_API_KEY');
-      localStorage.removeItem('DEEPSEEK_API_KEY');
-      setKey('');
-      toast.success('已清除本地密钥配置');
-    } catch (e) {
-      console.error('清除 DeepSeek API Key 失败', e);
-      toast.error('清除失败');
-    }
-  };
-
-  return (
-    <div className='space-y-3'>
-      <label className='block text-sm font-semibold text-gray-800 dark:text-gray-200'>DeepSeek API Key</label>
-      <div className='flex gap-2 items-center'>
-        <input
-          type={show ? 'text' : 'password'}
-          value={key}
-          onChange={e => setKey(e.target.value)}
-          placeholder='sk-...'
-          className='flex-1 px-4 py-3 bg-white/80 dark:bg-theme-gray-700 border-2 border-gray-200 dark:border-theme-gray-600 rounded-lg focus:ring-4 focus:ring-purple-500/30 focus:border-purple-500 transition-all text-base text-gray-800 dark:text-gray-100'
-        />
-        <button
-          onClick={() => setShow(s => !s)}
-          aria-label={show ? '隐藏密钥' : '显示密钥'}
-          className='px-3 py-2 rounded-lg bg-gray-100 dark:bg-theme-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-theme-gray-600 transition-all'
-        >
-          <EyeOff className='w-5 h-5' />
-        </button>
-      </div>
-      <div className='flex gap-2'>
-        <button
-          onClick={save}
-          className='px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold transition-all'
-        >
-          保存
-        </button>
-        <button
-          onClick={clear}
-          className='px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 transition-all'
-        >
-          清除
-        </button>
-      </div>
-      <p className='text-xs sm:text-sm text-gray-500 dark:text-gray-400'>
-        提示：未在打包环境注入时，原生端将使用此本地配置。
-      </p>
-    </div>
-  );
 }
 
 interface SettingsProps {
@@ -789,17 +711,6 @@ const Settings = ({ immersiveMode = false, onImmersiveModeChange, onThemeChange 
               </div>
 
               <div className='space-y-4 sm:space-y-5 lg:space-y-6'>
-                {/* AI 服务配置：DeepSeek API Key 运行时设置（移动端可用） */}
-                <Card variant='default' padding='md' className='p-4 sm:p-5 lg:p-6 hover:shadow-lg transition-all duration-200'>
-                  <div className='flex items-center space-x-3 sm:space-x-4 mb-4'>
-                    <Lock className='w-6 h-6 sm:w-7 sm:h-7 text-purple-600 dark:text-purple-400' />
-                    <div>
-                      <h4 className='font-semibold text-base sm:text-lg text-gray-800 dark:text-gray-200'>AI 服务配置</h4>
-                      <p className='text-sm sm:text-base text-gray-600 dark:text-gray-400'>设置 DeepSeek API Key（原生端运行时读取）</p>
-                    </div>
-                  </div>
-                  <DeepseekKeyForm />
-                </Card>
                 {/* 主题模式（统一管理：系统/浅色/深色/按时自动） */}
                 <Card
                   variant='default'
