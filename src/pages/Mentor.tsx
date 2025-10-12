@@ -584,7 +584,7 @@ const BreathingGuide: React.FC<{
 
 // 正念冥想组件（10分钟引导，含阶段步骤与计时）
 const MindfulnessMeditation: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const [phase, setPhase] = useState<'prepare' | 'breathing' | 'body' | 'thoughts' | 'complete'>('prepare');
+  const [_phase, setPhase] = useState<'prepare' | 'breathing' | 'body' | 'thoughts' | 'complete'>('prepare');
   const [timeLeft, setTimeLeft] = useState(600); // 10分钟
   const [isActive, setIsActive] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
