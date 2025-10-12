@@ -1,23 +1,22 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState, useEffect, useMemo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { MessageSquare, ShieldAlert, Send, Fingerprint } from 'lucide-react';
+import { Send, Menu, Plus, X, Phone, RotateCcw, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import Card from '../components/Card';
 import Container from '../components/Container';
 import Header from '../components/Header';
 import Modal from '../components/Modal';
-import Button from '../components/Button';
 import { useImmersiveMode } from '../hooks/useImmersiveMode';
-import { useMoodStats, useMoodTrend, useTodayRecords } from '../store';
 
-import { deepseekChat, deepseekChatWithRetry, buildMentorSystemPrompt, buildReframePrompt } from '../lib/llm';
-import { useNetworkStatus } from '../hooks/useMobile';
+import { deepseekChatWithRetry, buildMentorSystemPrompt } from '../lib/llm';
+import { useNetworkStatus, useIsMobile } from '../hooks/useMobile';
 import { cn } from '../utils/cn';
 import { chatPresetGroups } from '../constants/presets';
 
+// personaPrompt（AI角色提示词）
 const personaPrompt = `
-角色：温暖、稳重的 AI 情绪疏导师。你的目标是在当下帮助用户缓解情绪、获得清晰，并形成可持续的自助练习与反思。
+角色：温暖、稳重的 AI 伴侣。你的目标是在当下帮助用户缓解情绪、获得清晰，并形成可持续的自助练习与反思。
 
 原则：
 - 使用中文、短句、友善且不评判；先共情再给建议。
@@ -26,7 +25,7 @@ const personaPrompt = `
 
 回应结构（按序）：
 1) 共情与归纳：用 1–2 句准确复述用户的核心感受/困扰。
-2) 微建议或练习：从“呼吸练习”“正念冥想”“感官回归”“认知重构”“情绪日记”中挑选最贴切的 1 项，给出 2–5 步的简明操作与预计时长（如 3 分钟）。可提示“点击下方按钮开始”。
+2) 微建议或练习：从“呼吸练习”“正念冥想”“5-4-3-2-1锚定练习”“认知重构”中挑选最贴切的 1 项，给出 2–5 步的简明操作与预计时长（如 3 分钟）。可提示“点击下方按钮开始”。
 3) 追问：提出一个具体的小问题，帮助澄清诱因、需求或边界。
 4) 可保存要点：给出 1–3 条可记录到日记的关键词或句子。
 
@@ -44,8 +43,19 @@ interface ChatBubble {
   streamStartAt?: number;
 }
 
+interface ChatSession {
+  id: string;
+  title: string;
+  messages: ChatBubble[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 // 智能判断是否显示练习按钮的函数
-const shouldShowExerciseButton = (content: string, exerciseType: 'breathing' | 'reframe' | 'grounding'): boolean => {
+const shouldShowExerciseButton = (
+  content: string,
+  exerciseType: 'breathing' | 'reframe' | 'grounding' | 'mindfulness'
+): boolean => {
   switch (exerciseType) {
     case 'breathing':
       return /呼吸|焦虑|紧张|压力|放松|冷静|深呼吸|breathing|anxiety|stress|relax|calm/i.test(content);
@@ -53,11 +63,241 @@ const shouldShowExerciseButton = (content: string, exerciseType: 'breathing' | '
       return /想法|思维|认知|重构|负面|消极|思考|perspective|thought|cognitive|reframe|negative/i.test(content);
     case 'grounding':
       return /感官|当下|专注|注意力|锚定|grounding|present|focus|attention|mindful/i.test(content);
+    case 'mindfulness':
+      return /正念|冥想|觉察|当下|专注呼吸|mindfulness|meditation/i.test(content);
     default:
       return false;
   }
 };
 
+// AI 头像组件（优先使用实际图片，失败时回退到内置样式）
+const AIAvatar: React.FC = () => {
+  const [imgError, setImgError] = useState(false);
+  return (
+    <div className='flex justify-center mb-6'>
+      <div className='relative'>
+        <div className='w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-800/30 dark:to-purple-700/20 border-2 border-white dark:border-gray-700 shadow-lg flex items-center justify-center'>
+          {/* 优先显示实际头像图片，加载失败时回退到原“AI 头像”样式 */}
+          {!imgError ? (
+            <img
+              src='/avatar-mentor.gif'
+              alt='导师头像'
+              className='w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover'
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <div className='w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center'>
+              <div className='text-white text-2xl sm:text-3xl font-bold'>AI</div>
+            </div>
+          )}
+        </div>
+        {/* 通话图标 */}
+        <div
+          onClick={() =>
+            toast.info('AI 伴侣语音通话功能正在开发中 ...', {
+              description: '敬请期待后续版本的智能语音通话体验'
+            })
+          }
+          role='button'
+          title='语音通话'
+          aria-label='AI 语音通话正在开发中'
+          className='absolute bottom-0 right-0 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-700 shadow-md cursor-pointer hover:scale-105 active:scale-95 transition-transform'>
+          <Phone className='w-4 h-4 text-white' />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 预设问题组件
+const PresetQuestions: React.FC<{
+  questions: string[];
+  onQuestionClick: (question: string) => void;
+  onRefresh: () => void;
+}> = ({ questions, onQuestionClick, onRefresh }) => {
+  return (
+    <div className='mb-6'>
+      <div className='space-y-3 mb-4'>
+        {questions.map((question, index) => (
+          <button
+            key={index}
+            onClick={() => onQuestionClick(question)}
+            className='w-full p-4 text-left bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-xl border border-blue-200/50 dark:border-blue-700/30 transition-all duration-200 text-blue-800 dark:text-blue-200 text-sm sm:text-base'>
+            {question}
+          </button>
+        ))}
+      </div>
+
+      <button
+        onClick={onRefresh}
+        className='flex items-center gap-2 mx-auto px-4 py-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors duration-200'>
+        <RotateCcw className='w-4 h-4' />
+        <span className='text-sm'>换一换</span>
+      </button>
+    </div>
+  );
+};
+
+// 历史会话抽屉组件
+const HistoryDrawer: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  sessions: ChatSession[];
+  currentSessionId: string | null;
+  onSessionSelect: (sessionId: string) => void;
+  onNewSession: () => void;
+}> = ({ isOpen, onClose, sessions, currentSessionId, onSessionSelect, onNewSession }) => {
+  if (!isOpen) return null;
+
+  return (
+    <>
+      {/* 遮罩层 */}
+      <div className='fixed inset-0 bg-black/50 z-40 transition-opacity duration-300' onClick={onClose} />
+
+      {/* 抽屉内容 */}
+      <div className='fixed left-0 top-0 h-full w-80 bg-white dark:bg-gray-800 z-50 transform transition-transform duration-300 shadow-xl'>
+        <div className='flex flex-col h-full'>
+          {/* 抽屉头部 */}
+          <div className='flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700'>
+            <h2 className='text-lg font-semibold text-gray-800 dark:text-gray-200'>历史会话</h2>
+            <button
+              onClick={onNewSession}
+              title='新建会话'
+              aria-label='新建会话'
+              className='p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-900/50 text-purple-600 dark:text-purple-400 transition-colors duration-200'>
+              <Plus className='w-5 h-5' />
+            </button>
+          </div>
+
+          {/* 会话列表 */}
+          <div
+            className='flex-1 overflow-y-auto p-4 space-y-2 pb-safe-area-inset-bottom'
+            style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 80px)' }}>
+            {sessions.length === 0 ? (
+              <div className='text-center text-gray-500 dark:text-gray-400 py-8'>暂无历史会话</div>
+            ) : (
+              sessions.map(session => (
+                <button
+                  key={session.id}
+                  onClick={() => {
+                    onSessionSelect(session.id);
+                    onClose();
+                  }}
+                  className={cn(
+                    'w-full p-3 text-left rounded-lg transition-all duration-200',
+                    currentSessionId === session.id
+                      ? 'bg-purple-100 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700'
+                      : 'bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  )}>
+                  <div className='font-medium text-gray-800 dark:text-gray-200 text-sm truncate'>{session.title}</div>
+                  <div className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
+                    {new Date(session.updatedAt).toLocaleDateString()}
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// 新会话界面组件
+const NewSessionView: React.FC<{
+  onQuestionSubmit: (question: string) => void;
+  onStartExercise: () => void;
+}> = ({ onQuestionSubmit, onStartExercise }) => {
+  const [currentPresetIndex, setCurrentPresetIndex] = useState(0);
+  const [inputValue, setInputValue] = useState('');
+
+  const currentPresets = useMemo(() => {
+    const allPresets = chatPresetGroups.flatMap(group => group.items);
+    const startIndex = (currentPresetIndex * 2) % allPresets.length;
+    return allPresets.slice(startIndex, startIndex + 2);
+  }, [currentPresetIndex]);
+
+  const handleRefreshPresets = () => {
+    setCurrentPresetIndex(prev => prev + 1);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (inputValue.trim()) {
+      onQuestionSubmit(inputValue.trim());
+      setInputValue('');
+    }
+  };
+
+  const handlePresetClick = (preset: string) => {
+    if (preset && preset.trim()) {
+      onQuestionSubmit(preset);
+    }
+  };
+
+  return (
+    <div className='flex flex-col h-full min-h-0'>
+      {/* 主要内容区域 - 可滚动 */}
+      <div className='flex-1 flex flex-col justify-center px-4 pb-8 min-h-0 overflow-y-auto'>
+        {/* AI 头像 */}
+        <AIAvatar />
+
+        {/* AI 简介 */}
+        <div className='text-center mb-8'>
+          <p className='text-gray-600 dark:text-gray-400 text-sm sm:text-base px-4'>
+            我是您的专属 AI 伴侣，随时为您提供温暖的心理陪伴与温和的情绪疏导
+          </p>
+        </div>
+
+        {/* 预设问题 */}
+        <PresetQuestions
+          questions={currentPresets}
+          onQuestionClick={handlePresetClick}
+          onRefresh={handleRefreshPresets}
+        />
+      </div>
+
+      {/* 底部输入区域 - 固定在底部 */}
+      <div className='flex-shrink-0 px-4 pb-4'>
+        {/* 快捷按钮 */}
+        <div className='flex justify-center mb-4'>
+          <button
+            onClick={onStartExercise}
+            aria-label='打开疏导练习抽屉'
+            className='group px-5 sm:px-6 py-2.5 sm:py-3 rounded-full bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-700 hover:to-purple-700 text-white text-sm sm:text-base font-semibold shadow-md hover:shadow-lg ring-2 ring-purple-200/60 dark:ring-purple-700/40 transition-all duration-200 active:scale-95 bg-[length:220%_220%] animate-[gradient-shift_6s_ease_infinite] motion-reduce:animate-none'>
+            <span className='flex items-center gap-1.5 sm:gap-2'>
+              <Sparkles className='w-4 h-4 sm:w-5 sm:h-5 animate-pulse' />
+              <span>开始情绪疏导练习</span>
+            </span>
+          </button>
+        </div>
+
+        {/* 输入卡片 */}
+        <Card className='p-4'>
+          <form onSubmit={handleSubmit} className='flex gap-3'>
+            <input
+              type='text'
+              value={inputValue}
+              onChange={e => setInputValue(e.target.value)}
+              placeholder='输入您的问题或想法...'
+              className='flex-1 px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400'
+            />
+            <button
+              type='submit'
+              title='发送'
+              aria-label='发送'
+              disabled={!inputValue.trim()}
+              className='p-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white rounded-xl transition-colors duration-200 disabled:cursor-not-allowed'>
+              <Send className='w-5 h-5' />
+            </button>
+          </form>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+// 消息项组件
 const MessageItem = React.memo(
   ({
     m,
@@ -65,6 +305,7 @@ const MessageItem = React.memo(
     onStartBreath,
     onStartReframe,
     onStartGrounding,
+    onStartMindfulness,
     onCopyMessage,
     onRegenerateMessage,
     hoveredMessageId,
@@ -75,31 +316,73 @@ const MessageItem = React.memo(
     onStartBreath: (seconds: number, pace: { inhale: number; hold: number; exhale: number }) => void;
     onStartReframe: () => void;
     onStartGrounding: (initial: number) => void;
+    onStartMindfulness: () => void;
     onCopyMessage?: (content: string) => void;
     onRegenerateMessage?: (messageId: string) => void;
     hoveredMessageId?: string | null;
     onMessageHover?: (messageId: string | null) => void;
   }) => {
     const isHovered = hoveredMessageId === m.id;
-    
+
+    const mdComponents = React.useMemo(
+      () => ({
+        p: ({ children }: { children: React.ReactNode }) => (
+          <p className='mb-2 whitespace-pre-wrap leading-relaxed xl:leading-loose'>{children}</p>
+        ),
+        code: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => {
+          const inline = (props as { inline?: boolean }).inline;
+          return inline ? (
+            <code className='bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm' {...props}>
+              {children}
+            </code>
+          ) : (
+            <pre className='bg-gray-100 dark:bg-gray-800 p-3 rounded-lg overflow-x-auto'>
+              <code {...props}>{children}</code>
+            </pre>
+          );
+        },
+        ul: ({ children }: { children: React.ReactNode }) => <ul className='mb-2 pl-4'>{children}</ul>,
+        ol: ({ children }: { children: React.ReactNode }) => <ol className='mb-2 pl-4'>{children}</ol>,
+        li: ({ children }: { children: React.ReactNode }) => <li className='mb-1'>{children}</li>,
+        blockquote: ({ children }: { children: React.ReactNode }) => (
+          <blockquote className='border-l-4 border-purple-500 bg-purple-50 dark:bg-purple-900/20 p-3 rounded-r-lg mb-2'>
+            {children}
+          </blockquote>
+        ),
+        h1: ({ children }: { children: React.ReactNode }) => (
+          <h1 className='text-xl font-bold mb-2 mt-3'>{children}</h1>
+        ),
+        h2: ({ children }: { children: React.ReactNode }) => (
+          <h2 className='text-lg font-bold mb-2 mt-3'>{children}</h2>
+        ),
+        h3: ({ children }: { children: React.ReactNode }) => (
+          <h3 className='text-base font-bold mb-2 mt-3'>{children}</h3>
+        )
+      }),
+      []
+    );
+
+    const estRemainingText = React.useMemo(() => {
+      const target = 800;
+      const start = m.streamStartAt ?? Date.now();
+      const elapsedSec = Math.max(1, (Date.now() - start) / 1000);
+      const rate = Math.max(8, m.content.length / elapsedSec);
+      const remainingChars = Math.max(0, target - m.content.length);
+      const estSec = Math.round(remainingChars / rate);
+      const mm = Math.floor(estSec / 60);
+      const ss = estSec % 60;
+      return `预计剩余 ${mm > 0 ? `${mm}分${ss}秒` : `${ss}秒`}`;
+    }, [m.content.length, m.streamStartAt]);
+
     return (
       <div
         className={
           m.role === 'assistant'
-            ? `${
-                hasConversation
-                  ? 'max-w-full sm:max-w-[90%] md:max-w-[85%] lg:max-w-[80%] xl:max-w-[75%] 2xl:max-w-[70%]'
-                  : 'max-w-full sm:max-w-[96%] md:max-w-[94%] lg:max-w-[92%] xl:max-w-[90%] 2xl:max-w-[88%]'
-              } bg-gradient-to-br from-purple-50 to-purple-100/80 dark:from-purple-900/20 dark:to-purple-800/10 border border-purple-200/80 dark:border-purple-700/40 ring-1 ring-purple-100/50 dark:ring-purple-700/30 rounded-2xl p-3 shadow-md hover:shadow-lg dark:shadow-purple-900/10 transition-all duration-300 animate-in slide-in-from-left-2 fade-in-0 relative group`
-            : `ml-auto ${
-                hasConversation
-                  ? 'max-w-full sm:max-w-[90%] md:max-w-[85%] lg:max-w-[80%] xl:max-w-[75%] 2xl:max-w-[70%]'
-                  : 'max-w-full sm:max-w-[96%] md:max-w-[94%] lg:max-w-[92%] xl:max-w-[90%] 2xl:max-w-[88%]'
-              } bg-gradient-to-br from-blue-50 to-blue-100/80 dark:from-blue-900/20 dark:to-blue-800/10 border border-blue-200/80 dark:border-blue-700/40 ring-1 ring-blue-100/50 dark:ring-blue-700/30 rounded-2xl p-3 shadow-md hover:shadow-lg dark:shadow-blue-900/10 transition-all duration-300 animate-in slide-in-from-right-2 fade-in-0 relative group`
+            ? `max-w-[98%] sm:max-w-[92%] md:max-w-[88%] lg:max-w-[85%] xl:max-w-[90%] 2xl:max-w-[92%] bg-gradient-to-br from-purple-50 to-purple-100/80 dark:from-purple-900/20 dark:to-purple-800/10 border border-purple-200/80 dark:border-purple-700/40 ring-1 ring-purple-100/50 dark:ring-purple-700/30 rounded-2xl p-3 sm:p-4 shadow-md hover:shadow-lg dark:shadow-purple-900/10 transition-all duration-300 animate-in slide-in-from-left-2 fade-in-0 relative group`
+            : `ml-auto max-w-[98%] sm:max-w-[92%] md:max-w-[88%] lg:max-w-[85%] xl:max-w-[90%] 2xl:max-w-[92%] bg-gradient-to-br from-blue-50 to-blue-100/80 dark:from-blue-900/20 dark:to-blue-800/10 border border-blue-200/80 dark:border-blue-700/40 ring-1 ring-blue-100/50 dark:ring-blue-700/30 rounded-2xl p-3 sm:p-4 shadow-md hover:shadow-lg dark:shadow-blue-900/10 transition-all duration-300 animate-in slide-in-from-right-2 fade-in-0 relative group`
         }
         onMouseEnter={() => onMessageHover?.(m.id)}
         onMouseLeave={() => onMessageHover?.(null)}>
-        
         {/* 消息操作按钮 */}
         {(isHovered || hasConversation) && onCopyMessage && (
           <div className='absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200'>
@@ -108,7 +391,12 @@ const MessageItem = React.memo(
               className='p-1.5 rounded-lg bg-white/80 dark:bg-gray-800/80 hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-all duration-200 shadow-sm hover:shadow-md'
               title='复制消息'>
               <svg className='w-3.5 h-3.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z' />
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={2}
+                  d='M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z'
+                />
               </svg>
             </button>
             {m.role === 'assistant' && onRegenerateMessage && (
@@ -117,44 +405,20 @@ const MessageItem = React.memo(
                 className='p-1.5 rounded-lg bg-white/80 dark:bg-gray-800/80 hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-all duration-200 shadow-sm hover:shadow-md'
                 title='重新生成'>
                 <svg className='w-3.5 h-3.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15' />
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={2}
+                    d='M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'
+                  />
                 </svg>
               </button>
             )}
           </div>
         )}
-        
+
         <div className='text-sm sm:text-base lg:text-lg text-gray-800 dark:text-gray-200 prose prose-sm sm:prose-base lg:prose-lg dark:prose-invert max-w-none prose-p:mb-2 prose-p:leading-relaxed xl:prose-p:leading-loose prose-headings:mb-2 prose-headings:mt-3 prose-ul:mb-2 prose-ol:mb-2 prose-li:mb-1 prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-gray-100 dark:prose-pre:bg-gray-800 prose-pre:p-3 prose-pre:rounded-lg prose-blockquote:border-l-purple-500 prose-blockquote:bg-purple-50 dark:prose-blockquote:bg-purple-900/20 prose-blockquote:p-3 prose-blockquote:rounded-r-lg'>
-          <ReactMarkdown
-            components={{
-              p: ({ children }) => <p className='mb-2 whitespace-pre-wrap leading-relaxed xl:leading-loose'>{children}</p>,
-              code: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => {
-                const inline = props.inline;
-                return inline ? (
-                  <code className='bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm' {...props}>
-                    {children}
-                  </code>
-                ) : (
-                  <pre className='bg-gray-100 dark:bg-gray-800 p-3 rounded-lg overflow-x-auto'>
-                    <code {...props}>{children}</code>
-                  </pre>
-                );
-              },
-              ul: ({ children }) => <ul className='mb-2 pl-4'>{children}</ul>,
-              ol: ({ children }) => <ol className='mb-2 pl-4'>{children}</ol>,
-              li: ({ children }) => <li className='mb-1'>{children}</li>,
-              blockquote: ({ children }) => (
-                <blockquote className='border-l-4 border-purple-500 bg-purple-50 dark:bg-purple-900/20 p-3 rounded-r-lg mb-2'>
-                  {children}
-                </blockquote>
-              ),
-              h1: ({ children }) => <h1 className='text-xl font-bold mb-2 mt-3'>{children}</h1>,
-              h2: ({ children }) => <h2 className='text-lg font-bold mb-2 mt-3'>{children}</h2>,
-              h3: ({ children }) => <h3 className='text-base font-bold mb-2 mt-3'>{children}</h3>,
-            }}
-          >
-            {m.content}
-          </ReactMarkdown>
+          <ReactMarkdown components={mdComponents}>{m.content}</ReactMarkdown>
         </div>
         {m.streaming && (
           <div className='mt-3 flex items-center gap-3 p-2 rounded-lg bg-purple-100/50 dark:bg-purple-900/30 border border-purple-200/50 dark:border-purple-700/50'>
@@ -169,41 +433,31 @@ const MessageItem = React.memo(
               </span>
             </div>
             <div className='flex-1 text-right'>
-              <span className='text-xs text-purple-600 dark:text-purple-400'>
-                {(() => {
-                  const target = 800;
-                  const start = m.streamStartAt ?? Date.now();
-                  const elapsedSec = Math.max(1, (Date.now() - start) / 1000);
-                  const rate = Math.max(8, m.content.length / elapsedSec);
-                  const remainingChars = Math.max(0, target - m.content.length);
-                  const estSec = Math.round(remainingChars / rate);
-                  const mm = Math.floor(estSec / 60);
-                  const ss = estSec % 60;
-                  return `预计剩余 ${mm > 0 ? `${mm}分${ss}秒` : `${ss}秒`}`;
-                })()}
-              </span>
+              <span className='text-xs text-purple-600 dark:text-purple-400'>{estRemainingText}</span>
             </div>
           </div>
         )}
         {m.role === 'assistant' && !m.streaming && (
-          <div className='mt-3 flex flex-wrap gap-2'>
+          <div className='mt-3 flex flex-wrap gap-1.5 sm:gap-2'>
             {/* 智能显示练习按钮 - 根据AI回复内容判断 */}
             {shouldShowExerciseButton(m.content, 'breathing') && (
               <>
                 <button
                   onClick={() => onStartBreath(180, { inhale: 4, hold: 4, exhale: 6 })}
-                  className='group h-8 sm:h-9 px-3 py-1 rounded-lg text-sm bg-gradient-to-r from-blue-100 to-blue-50 dark:from-blue-900/30 dark:to-blue-800/20 hover:from-blue-200 hover:to-blue-100 dark:hover:from-blue-800/40 dark:hover:to-blue-700/30 text-blue-700 dark:text-blue-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-700 active:scale-95 border border-blue-200/50 dark:border-blue-700/30 shadow-sm hover:shadow-md'>
-                  <span className='flex items-center gap-1.5'>
-                    <div className='w-2 h-2 rounded-full bg-blue-500 group-hover:animate-pulse'></div>
-                    呼吸练习 · 3分钟
+                  className='group h-8 sm:h-9 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm bg-gradient-to-r from-blue-100 to-blue-50 dark:from-blue-900/30 dark:to-blue-800/20 hover:from-blue-200 hover:to-blue-100 dark:hover:from-blue-800/40 dark:hover:to-blue-700/30 text-blue-700 dark:text-blue-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-700 active:scale-95 border border-blue-200/50 dark:border-blue-700/30 shadow-sm hover:shadow-md'>
+                  <span className='flex items-center gap-1 sm:gap-1.5'>
+                    <div className='w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500 group-hover:animate-pulse'></div>
+                    <span className='hidden xs:inline'>呼吸练习 · 3分钟</span>
+                    <span className='xs:hidden'>呼吸3分</span>
                   </span>
                 </button>
                 <button
                   onClick={() => onStartBreath(300, { inhale: 5, hold: 5, exhale: 7 })}
-                  className='group h-8 sm:h-9 px-3 py-1 rounded-lg text-sm bg-gradient-to-r from-blue-100 to-blue-50 dark:from-blue-900/30 dark:to-blue-800/20 hover:from-blue-200 hover:to-blue-100 dark:hover:from-blue-800/40 dark:hover:to-blue-700/30 text-blue-700 dark:text-blue-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-700 active:scale-95 border border-blue-200/50 dark:border-blue-700/30 shadow-sm hover:shadow-md'>
-                  <span className='flex items-center gap-1.5'>
-                    <div className='w-2 h-2 rounded-full bg-blue-500 group-hover:animate-pulse'></div>
-                    呼吸练习 · 5分钟（慢）
+                  className='group h-8 sm:h-9 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm bg-gradient-to-r from-blue-100 to-blue-50 dark:from-blue-900/30 dark:to-blue-800/20 hover:from-blue-200 hover:to-blue-100 dark:hover:from-blue-800/40 dark:hover:to-blue-700/30 text-blue-700 dark:text-blue-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-700 active:scale-95 border border-blue-200/50 dark:border-blue-700/30 shadow-sm hover:shadow-md'>
+                  <span className='flex items-center gap-1 sm:gap-1.5'>
+                    <div className='w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500 group-hover:animate-pulse'></div>
+                    <span className='hidden xs:inline'>呼吸练习 · 5分钟（慢）</span>
+                    <span className='xs:hidden'>呼吸5分</span>
                   </span>
                 </button>
               </>
@@ -211,20 +465,33 @@ const MessageItem = React.memo(
             {shouldShowExerciseButton(m.content, 'reframe') && (
               <button
                 onClick={onStartReframe}
-                className='group h-8 sm:h-9 px-3 py-1 rounded-lg text-sm bg-gradient-to-r from-purple-100 to-purple-50 dark:from-purple-900/30 dark:to-purple-800/20 hover:from-purple-200 hover:to-purple-100 dark:hover:from-purple-800/40 dark:hover:to-purple-700/30 text-purple-700 dark:text-purple-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-700 active:scale-95 border border-purple-200/50 dark:border-purple-700/30 shadow-sm hover:shadow-md'>
-                <span className='flex items-center gap-1.5'>
-                  <div className='w-2 h-2 rounded-full bg-purple-500 group-hover:animate-pulse'></div>
-                  认知重构练习
+                className='group h-8 sm:h-9 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm bg-gradient-to-r from-purple-100 to-purple-50 dark:from-purple-900/30 dark:to-purple-800/20 hover:from-purple-200 hover:to-purple-100 dark:hover:from-purple-800/40 dark:hover:to-purple-700/30 text-purple-700 dark:text-purple-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-700 active:scale-95 border border-purple-200/50 dark:border-purple-700/30 shadow-sm hover:shadow-md'>
+                <span className='flex items-center gap-1 sm:gap-1.5'>
+                  <div className='w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-purple-500 group-hover:animate-pulse'></div>
+                  <span className='hidden xs:inline'>认知重构练习</span>
+                  <span className='xs:hidden'>认知重构</span>
                 </span>
               </button>
             )}
             {shouldShowExerciseButton(m.content, 'grounding') && (
               <button
                 onClick={() => onStartGrounding(15)}
-                className='group h-8 sm:h-9 px-3 py-1 rounded-lg text-sm bg-gradient-to-r from-emerald-100 to-emerald-50 dark:from-emerald-900/30 dark:to-emerald-800/20 hover:from-emerald-200 hover:to-emerald-100 dark:hover:from-emerald-800/40 dark:hover:to-emerald-700/30 text-emerald-700 dark:text-emerald-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-700 active:scale-95 border border-emerald-200/50 dark:border-emerald-700/30 shadow-sm hover:shadow-md'>
-                <span className='flex items-center gap-1.5'>
-                  <div className='w-2 h-2 rounded-full bg-emerald-500 group-hover:animate-pulse'></div>
-                  锚定练习（每步15秒）
+                className='group h-8 sm:h-9 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm bg-gradient-to-r from-emerald-100 to-emerald-50 dark:from-emerald-900/30 dark:to-emerald-800/20 hover:from-emerald-200 hover:to-emerald-100 dark:hover:from-emerald-800/40 dark:hover:to-emerald-700/30 text-emerald-700 dark:text-emerald-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-700 active:scale-95 border border-emerald-200/50 dark:border-emerald-700/30 shadow-sm hover:shadow-md'>
+                <span className='flex items-center gap-1 sm:gap-1.5'>
+                  <div className='w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500 group-hover:animate-pulse'></div>
+                  <span className='hidden xs:inline'>锚定练习（每步15秒）</span>
+                  <span className='xs:hidden'>锚定练习</span>
+                </span>
+              </button>
+            )}
+            {shouldShowExerciseButton(m.content, 'mindfulness') && (
+              <button
+                onClick={onStartMindfulness}
+                className='group h-8 sm:h-9 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm bg-gradient-to-r from-amber-100 to-amber-50 dark:from-amber-900/30 dark:to-amber-800/20 hover:from-amber-200 hover:to-amber-100 dark:hover:from-amber-800/40 dark:hover:to-amber-700/30 text-amber-700 dark:text-amber-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-amber-300 dark:focus:ring-amber-700 active:scale-95 border border-amber-200/50 dark:border-amber-700/30 shadow-sm hover:shadow-md'>
+                <span className='flex items-center gap-1 sm:gap-1.5'>
+                  <div className='w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-amber-500 group-hover:animate-pulse'></div>
+                  <span className='hidden xs:inline'>正念冥想 · 10分钟</span>
+                  <span className='xs:hidden'>正念冥想</span>
                 </span>
               </button>
             )}
@@ -241,6 +508,7 @@ const MessageItem = React.memo(
     prev.m.content === next.m.content
 );
 
+// 呼吸练习组件
 const BreathingGuide: React.FC<{
   onClose: () => void;
   totalSeconds?: number;
@@ -314,9 +582,9 @@ const BreathingGuide: React.FC<{
   );
 };
 
-// 正念冥想组件
+// 正念冥想组件（10分钟引导，含阶段步骤与计时）
 const MindfulnessMeditation: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const [_phase, setPhase] = useState<'prepare' | 'breathing' | 'body' | 'thoughts' | 'complete'>('prepare');
+  const [phase, setPhase] = useState<'prepare' | 'breathing' | 'body' | 'thoughts' | 'complete'>('prepare');
   const [timeLeft, setTimeLeft] = useState(600); // 10分钟
   const [isActive, setIsActive] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
@@ -356,13 +624,13 @@ const MindfulnessMeditation: React.FC<{ onClose: () => void }> = ({ onClose }) =
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isActive, timeLeft, steps]);
+  }, [isActive, timeLeft, steps, setPhase]);
 
   const footerButtons = (
     <>
       <button
         onClick={() => setIsActive(!isActive)}
-        className='order-1 col-span-1 btn btn-primary px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-500 active:scale-95 shadow-lg'>
+        className='px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-500 active:scale-95 shadow-lg'>
         {isActive ? '暂停' : '开始'}
       </button>
       <button
@@ -372,180 +640,32 @@ const MindfulnessMeditation: React.FC<{ onClose: () => void }> = ({ onClose }) =
           setPhase('prepare');
           setCurrentStep(0);
         }}
-        className='order-2 col-span-1 justify-self-end btn btn-danger px-6 py-3 rounded-xl bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600 active:scale-95'>
+        className='px-6 py-3 rounded-xl bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-500 active:scale-95'>
         重置
       </button>
-      {/* 完成阶段不再提供保存到日记按钮 */}
     </>
   );
 
   return (
-    <Modal
-      title='正念冥想'
-      onClose={onClose}
-      footer={footerButtons}
-      footerClassName='w-full grid grid-cols-2 gap-2 sm:flex sm:flex-row sm:flex-wrap sm:justify-between sm:items-center'
-      className='max-w-md'
-    >
-      <div className='text-center space-y-6'>
-        <div className='text-5xl sm:text-6xl mb-4 font-mono text-emerald-600 dark:text-emerald-300'>
-          {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-        </div>
-
-        <div className='space-y-3'>
-          <div className='text-2xl sm:text-3xl font-semibold text-gray-800 dark:text-gray-100'>
+    <Modal title='正念冥想' onClose={onClose} footer={footerButtons} className='max-w-md'>
+      <div className='space-y-4'>
+        <div className='text-center'>
+          <div className='text-5xl sm:text-6xl mb-2 font-mono text-emerald-600 dark:text-emerald-400'>
+            {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+          </div>
+          <div className='text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-200'>
             {steps[currentStep]?.title}
           </div>
-          <div className='text-base text-gray-600 dark:text-gray-300 leading-relaxed'>{steps[currentStep]?.desc}</div>
+          <div className='text-gray-600 dark:text-gray-400'>{steps[currentStep]?.desc}</div>
         </div>
 
-        {/* 进度条 */}
-        <div className='w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2'>
-          <div
-            className='bg-emerald-500 h-2 rounded-full transition-all duration-1000'
-            style={{ width: `${((600 - timeLeft) / 600) * 100}%` }}
-          />
-        </div>
-
-        {/* 步骤指示器 */}
-        <div className='flex justify-center space-x-2'>
-          {steps.map((_, idx) => (
+        <div className='grid grid-cols-5 gap-2'>
+          {steps.map((s, i) => (
             <div
-              key={idx}
-              className={`w-3 h-3 rounded-full transition-colors duration-300 ${
-                idx === currentStep
-                  ? 'bg-emerald-500'
-                  : idx < currentStep
-                  ? 'bg-emerald-300'
-                  : 'bg-gray-300 dark:bg-gray-600'
-              }`}
+              key={s.phase}
+              className={'h-2 rounded-full ' + (i <= currentStep ? 'bg-emerald-500' : 'bg-gray-200 dark:bg-gray-700')}
             />
           ))}
-        </div>
-      </div>
-    </Modal>
-  );
-};
-
-// 情绪日记组件
-const EmotionJournal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const [currentEmotion, setCurrentEmotion] = useState('');
-  const [intensity, setIntensity] = useState(5);
-  const [trigger, setTrigger] = useState('');
-  const [thoughts, setThoughts] = useState('');
-  const [bodyResponse, setBodyResponse] = useState('');
-  const [coping, setCoping] = useState('');
-
-  const emotions = [
-    '开心',
-    '平静',
-    '兴奋',
-    '满足',
-    '感激',
-    '焦虑',
-    '担心',
-    '紧张',
-    '恐惧',
-    '不安',
-    '愤怒',
-    '烦躁',
-    '失望',
-    '沮丧',
-    '无助',
-    '孤独',
-    '困惑',
-    '羞愧',
-    '内疚',
-    '嫉妒'
-  ];
-
-  const footerButtons = (
-    <>
-      <button
-        onClick={onClose}
-        className='px-5 py-3 rounded-xl bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-500 active:scale-95'>
-        关闭
-      </button>
-    </>
-  );
-
-  return (
-    <Modal title='情绪日记' onClose={onClose} footer={footerButtons} className='max-w-2xl'>
-      <div className='space-y-6'>
-        <div>
-          <label className='block text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3'>当前情绪</label>
-          <div className='grid grid-cols-3 sm:grid-cols-5 gap-2'>
-            {emotions.map(emotion => (
-              <button
-                key={emotion}
-                onClick={() => setCurrentEmotion(emotion)}
-                className={`p-2 rounded-lg text-sm transition-all duration-200 ${
-                  currentEmotion === emotion
-                    ? 'bg-blue-500 text-white shadow-md'
-                    : 'bg-gray-100 dark:bg-theme-gray-700 hover:bg-gray-200 dark:hover:bg-theme-gray-600 text-gray-700 dark:text-gray-200'
-                }`}>
-                {emotion}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className='block text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2'>
-            情绪强度：{intensity}/10
-          </label>
-          <input
-            type='range'
-            min={1}
-            max={10}
-            value={intensity}
-            onChange={e => setIntensity(Number(e.target.value))}
-            className='w-full slider'
-          />
-        </div>
-
-        <div>
-          <label className='block text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2'>触发事件</label>
-          <textarea
-            value={trigger}
-            onChange={e => setTrigger(e.target.value)}
-            placeholder='是什么引发了这种情绪？'
-            rows={2}
-            className='w-full p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-800/90 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500'
-          />
-        </div>
-
-        <div>
-          <label className='block text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2'>想法</label>
-          <textarea
-            value={thoughts}
-            onChange={e => setThoughts(e.target.value)}
-            placeholder='当时你在想什么？'
-            rows={2}
-            className='w-full p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-800/90 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500'
-          />
-        </div>
-
-        <div>
-          <label className='block text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2'>身体反应</label>
-          <textarea
-            value={bodyResponse}
-            onChange={e => setBodyResponse(e.target.value)}
-            placeholder='身体有什么感觉？（如心跳加速、肌肉紧张等）'
-            rows={2}
-            className='w-full p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-800/90 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500'
-          />
-        </div>
-
-        <div>
-          <label className='block text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2'>应对方式</label>
-          <textarea
-            value={coping}
-            onChange={e => setCoping(e.target.value)}
-            placeholder='你是如何处理这种情绪的？或者计划如何处理？'
-            rows={2}
-            className='w-full p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-800/90 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500'
-          />
         </div>
       </div>
     </Modal>
@@ -576,7 +696,16 @@ const CognitiveReframe: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
     setIsGenerating(true);
     try {
-      const prompt = buildReframePrompt({ scene, automaticThought, evidenceFor, evidenceAgainst });
+      // 简化的重构提示，不依赖外部函数
+      const prompt = `请帮我重构这个负面想法：
+
+情境：${scene}
+负面想法：${automaticThought}
+支持证据：${evidenceFor || '无'}
+反对证据：${evidenceAgainst || '无'}
+
+请提供3个更平衡、更现实的想法替代版本，每个版本一行。`;
+
       const result = await deepseekChatWithRetry([{ role: 'user', content: prompt }], { temperature: 0.7 });
 
       if ('content' in result) {
@@ -586,12 +715,13 @@ const CognitiveReframe: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       }
     } catch (error) {
       console.error('生成重构失败:', error);
+      toast.error('生成重构失败，请稍后重试');
     } finally {
       setIsGenerating(false);
     }
   };
 
- return (
+  return (
     <Modal
       title='认知重构练习'
       onClose={onClose}
@@ -600,26 +730,24 @@ const CognitiveReframe: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           <button
             onClick={generateReframe}
             disabled={!scene || !automaticThought || isGenerating}
-            className='order-1 col-span-1 btn btn-primary px-5 py-3 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-500 active:scale-95 disabled:cursor-not-allowed'>
+            className='px-5 py-3 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-500 active:scale-95 disabled:cursor-not-allowed'>
             {isGenerating ? '生成中...' : '生成重构'}
           </button>
           <button
             onClick={onClose}
-            className='order-2 col-span-1 justify-self-end btn btn-ghost px-5 py-3 rounded-xl bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-500 active:scale-95'>
-            取消
+            className='px-5 py-3 rounded-xl bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-500 active:scale-95'>
+            关闭
           </button>
           {reframes.length > 0 && (
             <button
               onClick={() => generateReframe()}
               disabled={isGenerating}
-              className='order-3 col-span-2 w-full sm:w-auto btn btn-ghost px-5 py-3 rounded-xl bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-800/40 text-blue-700 dark:text-blue-200 font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 active:scale-95'>
+              className='px-5 py-3 rounded-xl bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-800/40 text-blue-700 dark:text-blue-200 font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 active:scale-95'>
               生成新版本
             </button>
           )}
         </>
-      }
-      footerClassName='w-full grid grid-cols-2 gap-2 sm:flex sm:flex-row sm:flex-wrap sm:justify-between sm:items-center'
-    >
+      }>
       <div className='space-y-6'>
         <div>
           <label className='block text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2'>情境描述</label>
@@ -627,7 +755,7 @@ const CognitiveReframe: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             value={scene}
             onChange={e => setScene(e.target.value)}
             placeholder='描述让你困扰的具体情境...'
-            className='form-input w-full p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-800/90 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-500 focus:border-transparent transition-all duration-200'
+            className='w-full p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-800/90 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-500 focus:border-transparent transition-all duration-200'
           />
         </div>
 
@@ -638,7 +766,7 @@ const CognitiveReframe: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             onChange={e => setAutomaticThought(e.target.value)}
             placeholder='写下你的第一反应和负面想法...'
             rows={3}
-            className='form-input w-full p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-800/90 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-500 focus:border-transparent transition-all duration-200 resize-none'
+            className='w-full p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-800/90 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-500 focus:border-transparent transition-all duration-200 resize-none'
           />
         </div>
 
@@ -650,7 +778,7 @@ const CognitiveReframe: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               onChange={e => setEvidenceFor(e.target.value)}
               placeholder='有什么证据支持这个想法？'
               rows={3}
-              className='form-input w-full p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-800/90 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-500 focus:border-transparent transition-all duration-200 resize-none'
+              className='w-full p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-800/90 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-500 focus:border-transparent transition-all duration-200 resize-none'
             />
           </div>
           <div>
@@ -660,7 +788,7 @@ const CognitiveReframe: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               onChange={e => setEvidenceAgainst(e.target.value)}
               placeholder='有什么证据反对这个想法？'
               rows={3}
-              className='form-input w-full p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-800/90 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-500 focus:border-transparent transition-all duration-200 resize-none'
+              className='w-full p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-800/90 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-500 focus:border-transparent transition-all duration-200 resize-none'
             />
           </div>
         </div>
@@ -681,8 +809,6 @@ const CognitiveReframe: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           ))}
         </div>
 
-        {/* 底部操作统一到 Modal.footer */}
-
         {reframes.length > 0 && (
           <div className='space-y-4'>
             <div className='flex items-center gap-3'>
@@ -691,7 +817,7 @@ const CognitiveReframe: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 aria-label='选择认知重构版本'
                 value={selectedVersion}
                 onChange={e => setSelectedVersion(Number(e.target.value))}
-                className='form-input px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-500 transition-all duration-200'>
+                className='px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-500 transition-all duration-200'>
                 {reframes.map((_, idx) => (
                   <option key={idx} value={idx}>
                     版本 {idx + 1}
@@ -700,29 +826,157 @@ const CognitiveReframe: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               </select>
             </div>
 
-            <div className='p-4 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50'>
+            <div className='p-4 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200/50'>
               <div className='text-sm font-semibold text-green-800 dark:text-green-300 mb-2'>重构后的想法：</div>
               <div className='text-green-700 dark:text-green-200 leading-relaxed'>{reframes[selectedVersion]}</div>
             </div>
           </div>
         )}
-
-        {/* 取消/保存统一移至 Modal.footer */}
       </div>
     </Modal>
   );
 };
 
-// 感官回归（原 5-4-3-2-1 Grounding）组件
+// 疏导练习抽屉组件
+const ExerciseDrawer: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onStartBreath: (seconds: number, pace: { inhale: number; hold: number; exhale: number }) => void;
+  onStartReframe: () => void;
+  onStartGrounding: (initial: number) => void;
+  onStartMindfulness: () => void;
+}> = ({ isOpen, onClose, onStartBreath, onStartReframe: _onStartReframe, onStartGrounding, onStartMindfulness }) => {
+  if (!isOpen) return null;
+
+  const exercises = [
+    {
+      id: 'breathing-3min',
+      title: '3分钟呼吸练习',
+      description: '通过深呼吸放松身心',
+      icon: '🫁',
+      color: 'from-blue-100 to-blue-50 dark:from-blue-900/30 dark:to-blue-800/20',
+      hoverColor: 'hover:from-blue-200 hover:to-blue-100 dark:hover:from-blue-800/40 dark:hover:to-blue-700/30',
+      textColor: 'text-blue-700 dark:text-blue-300',
+      borderColor: 'border-blue-200/50 dark:border-blue-700/30',
+      onClick: () => {
+        onStartBreath(180, { inhale: 4, hold: 4, exhale: 6 });
+        onClose();
+      }
+    },
+    {
+      id: 'breathing-5min',
+      title: '5分钟呼吸练习',
+      description: '更深层的呼吸放松练习',
+      icon: '🫁',
+      color: 'from-blue-100 to-blue-50 dark:from-blue-900/30 dark:to-blue-800/20',
+      hoverColor: 'hover:from-blue-200 hover:to-blue-100 dark:hover:from-blue-800/40 dark:hover:to-blue-700/30',
+      textColor: 'text-blue-700 dark:text-blue-300',
+      borderColor: 'border-blue-200/50 dark:border-blue-700/30',
+      onClick: () => {
+        onStartBreath(300, { inhale: 5, hold: 5, exhale: 7 });
+        onClose();
+      }
+    },
+    {
+      id: 'grounding',
+      title: '5-4-3-2-1锚定练习',
+      description: '通过感官觉察回到当下',
+      icon: '⚓',
+      color: 'from-emerald-100 to-emerald-50 dark:from-emerald-900/30 dark:to-emerald-800/20',
+      hoverColor:
+        'hover:from-emerald-200 hover:to-emerald-100 dark:hover:from-emerald-800/40 dark:hover:to-emerald-700/30',
+      textColor: 'text-emerald-700 dark:text-emerald-300',
+      borderColor: 'border-emerald-200/50 dark:border-emerald-700/30',
+      onClick: () => {
+        onStartGrounding(15);
+        onClose();
+      }
+    },
+    {
+      id: 'reframe',
+      title: '认知重构练习',
+      description: '识别并重构负面或不合理想法',
+      icon: '🧠',
+      color: 'from-purple-100 to-purple-50 dark:from-purple-900/30 dark:to-purple-800/20',
+      hoverColor: 'hover:from-purple-200 hover:to-purple-100 dark:hover:from-purple-800/40 dark:hover:to-purple-700/30',
+      textColor: 'text-purple-700 dark:text-purple-300',
+      borderColor: 'border-purple-200/50 dark:border-purple-700/30',
+      onClick: () => {
+        _onStartReframe();
+        onClose();
+      }
+    },
+    {
+      id: 'mindfulness',
+      title: '正念冥想（10分钟）',
+      description: '跟随引导，温和地回到当下',
+      icon: '🧘',
+      color: 'from-amber-100 to-amber-50 dark:from-amber-900/30 dark:to-amber-800/20',
+      hoverColor: 'hover:from-amber-200 hover:to-amber-100 dark:hover:from-amber-800/40 dark:hover:to-amber-700/30',
+      textColor: 'text-amber-700 dark:text-amber-300',
+      borderColor: 'border-amber-200/50 dark:border-amber-700/30',
+      onClick: () => {
+        onStartMindfulness();
+        onClose();
+      }
+    }
+  ];
+
+  return (
+    <>
+      {/* 遮罩层 */}
+      <div className='fixed inset-0 bg-black/50 z-40 transition-opacity duration-300' onClick={onClose} />
+
+      {/* 抽屉内容 */}
+      <div className='fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 z-50 transform transition-transform duration-300 shadow-xl rounded-t-2xl'>
+        <div className='flex flex-col max-h-[80vh]'>
+          {/* 抽屉头部 */}
+          <div className='flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700'>
+            <h2 className='text-lg font-semibold text-gray-800 dark:text-gray-200'>选择练习</h2>
+            <button
+              onClick={onClose}
+              title='关闭'
+              aria-label='关闭'
+              className='p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors duration-200'>
+              <X className='w-5 h-5' />
+            </button>
+          </div>
+
+          {/* 练习列表 */}
+          <div
+            className='flex-1 overflow-y-auto p-4 pb-safe-area-inset-bottom space-y-3'
+            style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 80px)' }}>
+            {exercises.map(exercise => (
+              <button
+                key={exercise.id}
+                onClick={exercise.onClick}
+                className={`w-full p-4 text-left rounded-xl transition-all duration-200 ${exercise.color} ${exercise.hoverColor} ${exercise.textColor} border ${exercise.borderColor} shadow-sm hover:shadow-md active:scale-95`}>
+                <div className='flex items-center gap-3'>
+                  <div className='text-2xl'>{exercise.icon}</div>
+                  <div className='flex-1'>
+                    <div className='font-semibold text-base mb-1'>{exercise.title}</div>
+                    <div className='text-sm opacity-80'>{exercise.description}</div>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// 5-4-3-2-1锚定练习组件
 const Grounding54321: React.FC<{
   onClose: () => void;
   initialStepDuration?: number;
 }> = ({ onClose, initialStepDuration = 10 }) => {
-  const [five, setFive] = useState('');
-  const [four, setFour] = useState('');
-  const [three, setThree] = useState('');
-  const [two, setTwo] = useState('');
-  const [one, setOne] = useState('');
+  const [_five, setFive] = useState('');
+  const [_four, setFour] = useState('');
+  const [_three, setThree] = useState('');
+  const [_two, setTwo] = useState('');
+  const [_one, setOne] = useState('');
   const [step, setStep] = useState(0); // 0..4
   const [seconds, setSeconds] = useState(0);
   const [stepDuration, setStepDuration] = useState(initialStepDuration); // 可调每步时长（秒）
@@ -797,28 +1051,17 @@ const Grounding54321: React.FC<{
 
   useEffect(() => () => timerRef.current && window.clearInterval(timerRef.current), []);
 
-  const _buildText = () =>
-    [
-      '【感官回归 复盘】',
-      `看到的 5 样东西：${five || '（未填写）'}`,
-      `触摸到的 4 样东西：${four || '（未填写）'}`,
-      `听到的 3 种声音：${three || '（未填写）'}`,
-      `闻到的 2 种味道：${two || '（未填写）'}`,
-      `尝到的 1 种味道：${one || '（未填写）'}`
-    ].join('\n');
-
   return (
     <Modal
-      title='感官回归'
+      title='5-4-3-2-1锚定练习'
       onClose={onClose}
       footer={
         <div className='flex gap-2'>
           <button
             onClick={onClose}
-            className='btn btn-ghost px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-100'>
-            取消
+            className='px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-100'>
+            关闭
           </button>
-          {/* 已移除“保存到日记”按钮 */}
         </div>
       }>
       <div className='grid grid-cols-1 gap-3'>
@@ -832,7 +1075,7 @@ const Grounding54321: React.FC<{
             }`}>
             <div className='text-sm font-medium mb-2 text-gray-800 dark:text-gray-100'>{st.label}</div>
             <textarea
-              className='form-input w-full p-2 rounded-lg border border-gray-200 dark:border-theme-gray-600 bg-white dark:bg-theme-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-500'
+              className='w-full p-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-500'
               placeholder={st.placeholder}
               rows={2}
               onChange={e => st.setter(e.target.value)}
@@ -867,7 +1110,7 @@ const Grounding54321: React.FC<{
             max={20}
             value={stepDuration}
             onChange={e => setStepDuration(Number(e.target.value))}
-            className='w-full sm:w-56 slider'
+            className='w-full sm:w-56'
           />
           <span className='whitespace-nowrap'>{stepDuration}s</span>
         </div>
@@ -876,799 +1119,461 @@ const Grounding54321: React.FC<{
   );
 };
 
+// 主Mentor组件
 const Mentor: React.FC = () => {
-  const { immersiveMode } = useImmersiveMode();
-  const todayRecords = useTodayRecords();
-  const stats7d = useMoodStats(7);
-  const _trend7d = useMoodTrend(7);
-
+  const { immersiveMode: _immersiveMode } = useImmersiveMode();
   const { isOnline, connectionType } = useNetworkStatus();
+  const isMobile = useIsMobile();
 
+  // 聊天状态
+  const [messages, setMessages] = useState<ChatBubble[]>([]);
+  const [input, setInput] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
+  const [lastPrompt, setLastPrompt] = useState<string | null>(null);
+
+  // 历史会话状态
+  const [sessions, _setSessions] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+
+  // 练习状态
+  const [showExerciseDrawer, setShowExerciseDrawer] = useState(false);
   const [showBreath, setShowBreath] = useState(false);
+  const [showReframe, setShowReframe] = useState(false);
+  const [showGrounding, setShowGrounding] = useState(false);
+  const [showMindfulness, setShowMindfulness] = useState(false);
   const [breathParams, setBreathParams] = useState<{
     totalSeconds: number;
     pace: { inhale: number; hold: number; exhale: number };
   } | null>(null);
-  const [showReframe, setShowReframe] = useState(false);
-  const [showGrounding, setShowGrounding] = useState(false);
   const [groundingInitial, setGroundingInitial] = useState<number | null>(null);
-  const [showMindfulness, setShowMindfulness] = useState(false);
-  const [showEmotionJournal, setShowEmotionJournal] = useState(false);
-  const [input, setInput] = useState('');
-  // 统一改用 Toast 提示，无需额外输入提示状态
-  // 移动端软键盘优化
-  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
-  const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
-
+  // 流式输出与打字机效果相关 refs
+  const abortCtrlRef = useRef<AbortController | null>(null);
+  const streamBufferRef = useRef<string>('');
+  const typingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const abortedByUserRef = useRef<boolean>(false);
+  const lastAssistantContentRef = useRef<string>('');
+  // 修复闭包一致性：维护最新消息引用
+  const messagesRef = useRef<ChatBubble[]>(messages);
   useEffect(() => {
-    const handleResize = () => {
-      const currentHeight = window.innerHeight;
-      const heightDiff = viewportHeight - currentHeight;
-      
-      // 如果高度减少超过150px，认为是软键盘弹出
-      if (heightDiff > 150) {
-        setIsKeyboardOpen(true);
-      } else {
-        setIsKeyboardOpen(false);
-      }
-      
-      setViewportHeight(currentHeight);
-    };
-
-    const handleVisualViewportChange = () => {
-      if (window.visualViewport) {
-        const heightDiff = window.innerHeight - window.visualViewport.height;
-        setIsKeyboardOpen(heightDiff > 150);
-      }
-    };
-
-    // 监听窗口大小变化
-    window.addEventListener('resize', handleResize);
-    
-    // 监听Visual Viewport API（更准确的软键盘检测）
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleVisualViewportChange);
-    }
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleVisualViewportChange);
-      }
-    };
-  }, [viewportHeight]);
-
-  // 输入框获得焦点时的处理
-  const handleInputFocus = useCallback(() => {
-    // 延迟滚动，等待软键盘完全弹出
-    setTimeout(() => {
-      if (inputRef.current) {
-        inputRef.current.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'center',
-          inline: 'nearest'
-        });
-      }
-    }, 300);
-  }, []);
-
-  const [abortCtrl, setAbortCtrl] = useState<AbortController | null>(null);
-  const [_progress, setProgress] = useState(0);
-  const [_sendStartAt, setSendStartAt] = useState<number | null>(null);
-  const [lastError, setLastError] = useState<string | null>(null);
-  const [lastPrompt, setLastPrompt] = useState<string | null>(null);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [messages, setMessages] = useState<ChatBubble[]>([
-    {
-      id: 'm0',
-      role: 'assistant',
-      content:
-        '您好，我是 AI 情绪疏导师，很高兴遇见你 ✨ 无论此刻心情如何，我都在这里陪伴。想聊聊今天发生的事情吗？或者试试下方的放松练习也很不错～'
-    }
-  ]);
-  const [activeTab, setActiveTab] = useState<'chat' | 'exercises'>('chat');
-  const [isSending, setIsSending] = useState(false);
-  const [atBottom, setAtBottom] = useState(true);
-  // 从配置文件读取分组数据
-  const presetGroups = chatPresetGroups;
-  const [presetOpen, setPresetOpen] = useState(true);
-  // 暂时隐藏情绪日记练习板块
-  const JOURNAL_ENABLED = false;
-  const [hasStoredPreference, setHasStoredPreference] = useState(false);
-
-  // 记忆折叠状态：从 localStorage 读取并写入
-  useEffect(() => {
-    const saved = localStorage.getItem('mentorPresetOpen');
-    if (saved !== null) {
-      setPresetOpen(saved === 'true');
-      setHasStoredPreference(true);
-    }
-  }, []);
-  useEffect(() => {
-    localStorage.setItem('mentorPresetOpen', String(presetOpen));
-  }, [presetOpen]);
-
-  // 练习区折叠与进度状态
-  type ExerciseKey = 'breath' | 'reframe' | 'grounding' | 'mindfulness' | 'journal';
-  type ExerciseStatus = 'idle' | 'in_progress' | 'completed';
-  const [exerciseOpen, setExerciseOpen] = useState<Record<ExerciseKey, boolean>>({
-    breath: true,
-    reframe: true,
-    grounding: true,
-    mindfulness: true,
-    journal: true
-  });
-  const [exerciseStatus, setExerciseStatus] = useState<Record<ExerciseKey, ExerciseStatus>>({
-    breath: 'idle',
-    reframe: 'idle',
-    grounding: 'idle',
-    mindfulness: 'idle',
-    journal: 'idle'
-  });
-  const toggleExercise = (key: ExerciseKey) => setExerciseOpen(prev => ({ ...prev, [key]: !prev[key] }));
-  const markInProgress = (key: ExerciseKey) => setExerciseStatus(prev => ({ ...prev, [key]: 'in_progress' }));
-  const _markCompleted = (key: ExerciseKey) => setExerciseStatus(prev => ({ ...prev, [key]: 'completed' }));
-  const markIdle = (key: ExerciseKey) => setExerciseStatus(prev => ({ ...prev, [key]: 'idle' }));
-
-  const StatusBadge: React.FC<{ status: ExerciseStatus }> = ({ status }) => {
-    const map = {
-      idle: { label: '未开始', cls: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-200' },
-      in_progress: { label: '进行中', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-800/40 dark:text-blue-200' },
-      completed: {
-        label: '已完成',
-        cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-800/40 dark:text-emerald-200'
-      }
-    } as const;
-    const { label, cls } = map[status];
-    return <span className={`text-xs px-2 py-0.5 rounded-full ${cls}`}>{label}</span>;
-  };
-
-  // 已移除未使用的 suggestions 变量，避免潜在编译告警
-
-  const systemPrompt = useMemo(() => {
-    const base = buildMentorSystemPrompt({
-      avg7d: stats7d.avgIntensity,
-      mostMood: stats7d.mostCommonMood as string,
-      todayCount: todayRecords.length
-    });
-    return personaPrompt + '\n' + base;
-  }, [stats7d.avgIntensity, stats7d.mostCommonMood, todayRecords.length]);
-
-  // 自动滚动优化：仅在接近底部或用户刚发送时滚动
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const last = messages[messages.length - 1];
-    const userJustSent = !!last && last.role === 'user';
-    if (atBottom || userJustSent) {
-      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-      if (userJustSent) {
-        const card = document.getElementById('chat-card');
-        card?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    }
-  }, [messages, atBottom]);
-
-  // 监听滚动计算是否在底部
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const handler = () => {
-      const threshold = 80; // 离底部阈值
-      const isAt = el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
-      setAtBottom(isAt);
-    };
-    const opts: AddEventListenerOptions = { passive: true };
-    el.addEventListener('scroll', handler, opts);
-    handler();
-    return () => el.removeEventListener('scroll', handler);
-  }, [scrollRef]);
-
-  // 初始对话仅有引导语时收缩聊天卡片尺寸；开始对话后再扩展
-  const hasConversation = useMemo(() => {
-    const moreThanGreeting =
-      messages.length > 1 || messages.some(m => m.role === 'user') || messages.some(m => m.streaming);
-    return moreThanGreeting;
+    messagesRef.current = messages;
   }, [messages]);
 
-  // 虚拟化：仅在开始对话后启用（变量高度，动态测量）
+  // 虚拟化相关
+  const scrollRef = useRef<HTMLDivElement>(null);
   const rowVirtualizer = useVirtualizer({
-    count: hasConversation ? messages.length : 0,
+    count: messages.length > 0 ? messages.length : 0,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => 120,
     overscan: 8
   });
 
-  // 一旦开始对话，默认折叠预设问题（用户可手动展开）
-  useEffect(() => {
-    if (hasConversation && !hasStoredPreference) setPresetOpen(false);
-  }, [hasConversation, hasStoredPreference]);
-
-  // 自动滚动到对话区底部
-  const scrollToBottom = useCallback(() => {
-    setTimeout(() => {
-      const el = scrollRef.current;
-      if (el) {
-        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-        setAtBottom(true);
-      }
-    }, 100);
-  }, []);
-
-  const onSend = async () => {
-    const text = input.trim();
-    if (isSending) return;
-    if (!text) {
-      toast.error('请输入内容后再发送');
-      return;
-    }
-    setIsSending(true);
-    const controller = new AbortController();
-    setAbortCtrl(controller);
-    setProgress(0);
-    setSendStartAt(Date.now());
-    setLastError(null);
-    setLastPrompt(text);
-    const userMsg: ChatBubble = { id: `u-${Date.now()}`, role: 'user', content: text };
-    setMessages(prev => [
-      ...prev,
-      userMsg,
-      { id: `a-${Date.now()}`, role: 'assistant', content: '', streaming: true, streamStartAt: Date.now() }
-    ]);
-    setInput('');
-
-    // 发送消息后自动滚动到对话区
-    scrollToBottom();
-
-    const history: { role: 'user' | 'assistant' | 'system'; content: string }[] = messages.map(m => ({
-      role: m.role,
-      content: m.content
-    }));
-    let gen: Awaited<ReturnType<typeof deepseekChat>>;
-    try {
-      gen = await deepseekChat([...history, { role: 'user', content: text }], {
-        stream: true,
-        systemPrompt,
-        signal: controller.signal
-      });
-    } catch (e) {
-      setIsSending(false);
-      setLastError(String(e));
-      setMessages(prev =>
-        prev.map(m => (m.streaming ? { ...m, streaming: false, content: '抱歉，生成被中断或发生错误。' } : m))
-      );
-      return;
-    }
-    // 流式产出
-    if (typeof (gen as AsyncGenerator<string>)[Symbol.asyncIterator] === 'function') {
-      try {
-        for await (const chunk of gen as AsyncGenerator<string>) {
-          setMessages(prev => {
-            const next = [...prev];
-            const idx = next.findIndex(m => m.streaming);
-            if (idx >= 0) {
-              next[idx] = { ...next[idx], content: next[idx].content + chunk };
-            }
-            return next;
-          });
-          setProgress(prev => prev + chunk.length);
-        }
-        // 结束流式
-        setMessages(prev => prev.map(m => (m.streaming ? { ...m, streaming: false } : m)));
-        // AI回复完成后再次滚动到底部
-        scrollToBottom();
-      } catch (_e) {
-        // 处理中断
-        setLastError(String(_e));
-        setMessages(prev => prev.map(m => (m.streaming ? { ...m, streaming: false } : m)));
-      }
-    } else {
-      // 非流式响应
-      if ('content' in gen) {
-        const res = gen as { content: string };
-        setMessages(prev => prev.map(m => (m.streaming ? { ...m, streaming: false, content: res.content } : m)));
-        // 非流式回复完成后滚动到底部
-        scrollToBottom();
-      }
-    }
-    setIsSending(false);
-    setAbortCtrl(null);
-  };
-
-  // 预设问题快速发送（不依赖输入框状态）
-  const sendPreset = async (preset: string) => {
-    if (isSending) return;
-    const text = preset.trim();
-    if (!text) {
-      toast.error('请输入内容后再发送');
-      return;
-    }
-    setIsSending(true);
-    const controller = new AbortController();
-    setAbortCtrl(controller);
-    setProgress(0);
-    setSendStartAt(Date.now());
-    setLastError(null);
-    setLastPrompt(text);
-    const userMsg: ChatBubble = { id: `u-${Date.now()}`, role: 'user', content: text };
-    setMessages(prev => [
-      ...prev,
-      userMsg,
-      { id: `a-${Date.now()}`, role: 'assistant', content: '', streaming: true, streamStartAt: Date.now() }
-    ]);
-
-    // 点击预设问题后自动滚动到对话区
-    scrollToBottom();
-
-    const history: { role: 'user' | 'assistant' | 'system'; content: string }[] = messages.map(m => ({
-      role: m.role,
-      content: m.content
-    }));
-    let gen: Awaited<ReturnType<typeof deepseekChat>>;
-    try {
-      gen = await deepseekChat([...history, { role: 'user', content: text }], {
-        stream: true,
-        systemPrompt,
-        signal: controller.signal
-      });
-    } catch (e) {
-      setIsSending(false);
-      setLastError(String(e));
-      setMessages(prev =>
-        prev.map(m => (m.streaming ? { ...m, streaming: false, content: '抱歉，生成被中断或发生错误。' } : m))
-      );
-      return;
-    }
-    // 流式产出
-    if (typeof (gen as AsyncGenerator<string>)[Symbol.asyncIterator] === 'function') {
-      try {
-        for await (const chunk of gen as AsyncGenerator<string>) {
-          setMessages(prev => {
-            const next = [...prev];
-            const idx = next.findIndex(m => m.streaming);
-            if (idx >= 0) {
-              next[idx] = { ...next[idx], content: next[idx].content + chunk };
-            }
-            return next;
-          });
-          setProgress(prev => prev + chunk.length);
-        }
-        // 结束流式
-        setMessages(prev => prev.map(m => (m.streaming ? { ...m, streaming: false } : m)));
-        // AI回复完成后滚动到底部
-        scrollToBottom();
-      } catch (_e) {
-        // 处理中断
-        setLastError(String(_e));
-        setMessages(prev => prev.map(m => (m.streaming ? { ...m, streaming: false } : m)));
-      }
-    } else {
-      // 非流式响应
-      if ('content' in gen) {
-        const res = gen as { content: string };
-        setMessages(prev => prev.map(m => (m.streaming ? { ...m, streaming: false, content: res.content } : m)));
-        // 非流式回复完成后滚动到底部
-        scrollToBottom();
-      }
-    }
-    setIsSending(false);
-    setAbortCtrl(null);
-  };
-
-  const stopStreaming = () => {
-    abortCtrl?.abort();
-  };
-
-  // 文本域自适应高度
-  const inputRef = useRef<HTMLTextAreaElement | null>(null);
-  const adjustInputHeight = () => {
-    const el = inputRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    const max = 240; // 最大高度约 240px
-    el.style.height = `${Math.min(el.scrollHeight, max)}px`;
-  };
-
-  // 自动聚焦输入框
-  useEffect(() => {
-    if (activeTab === 'chat' && !isSending && inputRef.current) {
-      const timer = setTimeout(() => {
-        inputRef.current?.focus();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [activeTab, isSending, messages.length]);
-
-  // 消息操作功能
+  // 其他状态
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
-  
-  const copyMessage = (content: string) => {
-    navigator.clipboard.writeText(content).then(() => {
-      // 可以添加一个简单的提示
-      console.log('消息已复制到剪贴板');
-    });
+  const [atBottom, setAtBottom] = useState(true);
+
+  const hasConversation = messages.length > 0;
+
+  // 发送消息（支持流式与打字机效果）
+  const sendMessage = useCallback(
+    async (content: string) => {
+      if (!content.trim() || isSending) return;
+
+      const userMessage: ChatBubble = {
+        id: `u-${Date.now()}`,
+        role: 'user',
+        content: content.trim()
+      };
+
+      // 先插入用户消息与占位的助手消息（流式）
+      const assistantId = `a-${Date.now() + 1}`;
+      setMessages(prev => [
+        ...prev,
+        userMessage,
+        { id: assistantId, role: 'assistant', content: '', streaming: true, streamStartAt: Date.now() }
+      ]);
+      setInput('');
+      setIsSending(true);
+      setLastError(null);
+      setLastPrompt(content.trim());
+
+      // 滚动到底部，保证用户能看到输出
+      scrollToBottom();
+
+      try {
+        const baseSystem = buildMentorSystemPrompt({ avg7d: 5.0, mostMood: '平静', todayCount: 1 });
+        const systemContent = `${personaPrompt}\n\n${baseSystem}`;
+        const chatMessages = [...messagesRef.current, userMessage].map(m => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content
+        }));
+
+        // 创建可中断控制器
+        const controller = new AbortController();
+        abortCtrlRef.current = controller;
+
+        const gen = await deepseekChatWithRetry([{ role: 'system', content: systemContent }, ...chatMessages], {
+          stream: true,
+          systemPrompt: systemContent,
+          signal: controller.signal
+        });
+
+        // 如果是异步生成器，进行流式 + 打字机效果
+        if (typeof (gen as AsyncGenerator<string>)[Symbol.asyncIterator] === 'function') {
+          // 启动打字机调度器：支持代码块按行分段、可变节律
+          if (!typingTimerRef.current) {
+            const isInCodeBlock = (text: string) => {
+              const fences = (text.match(/```/g) || []).length;
+              return fences % 2 === 1;
+            };
+
+            const tick = () => {
+              // 若无内容，稍后再检查缓冲
+              if (!streamBufferRef.current.length) {
+                typingTimerRef.current = setTimeout(tick, 30);
+                return;
+              }
+
+              const preview = lastAssistantContentRef.current + streamBufferRef.current;
+              const codeMode = isInCodeBlock(preview);
+
+              let takeCount = codeMode ? 1 : 3;
+              // 代码块分段：长缓冲时按行展示（每次到换行符）
+              if (codeMode) {
+                const newlineIdx = streamBufferRef.current.indexOf('\n');
+                const longBuffer = streamBufferRef.current.length > 200;
+                if (longBuffer && newlineIdx !== -1 && newlineIdx < 120) {
+                  takeCount = newlineIdx + 1; // 到行末
+                }
+              }
+
+              const consume = streamBufferRef.current.slice(0, takeCount);
+              streamBufferRef.current = streamBufferRef.current.slice(takeCount);
+
+              setMessages(prev => {
+                const next = [...prev];
+                const idx = next.findIndex(m => m.id === assistantId);
+                if (idx >= 0) {
+                  const updated = { ...next[idx], content: next[idx].content + consume };
+                  next[idx] = updated;
+                  lastAssistantContentRef.current = updated.content;
+                }
+                return next;
+              });
+
+              const delay = codeMode ? (consume.includes('\n') ? 60 : 35) : 25;
+              typingTimerRef.current = setTimeout(tick, delay);
+            };
+
+            typingTimerRef.current = setTimeout(tick, 25);
+          }
+
+          try {
+            for await (const chunk of gen as AsyncGenerator<string>) {
+              streamBufferRef.current += chunk;
+            }
+          } finally {
+            // 等待缓冲区清空
+            const flush = async () => {
+              return new Promise<void>(resolve => {
+                const check = () => {
+                  if (!streamBufferRef.current.length) resolve();
+                  else setTimeout(check, 30);
+                };
+                check();
+              });
+            };
+            await flush();
+
+            // 结束打字机与流式标记
+            if (typingTimerRef.current) {
+              clearTimeout(typingTimerRef.current);
+              typingTimerRef.current = null;
+            }
+            setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, streaming: false } : m)));
+            scrollToBottom();
+          }
+        } else if ('content' in (gen as { content: string })) {
+          const res = gen as { content: string };
+          setMessages(prev =>
+            prev.map(m => (m.id === assistantId ? { ...m, streaming: false, content: res.content } : m))
+          );
+          scrollToBottom();
+        }
+      } catch (error) {
+        console.error('发送消息失败:', error);
+        setLastError(error instanceof Error ? error.message : '发送失败');
+        // 结束打字机定时器
+        if (typingTimerRef.current) {
+          clearTimeout(typingTimerRef.current);
+          typingTimerRef.current = null;
+        }
+        // 结束占位消息并给出提示
+        if (abortedByUserRef.current) {
+          setMessages(prev => prev.map(m => (m.streaming ? { ...m, streaming: false, content: m.content } : m)));
+          toast.info('已停止生成');
+        } else {
+          setMessages(prev =>
+            prev.map(m => (m.streaming ? { ...m, streaming: false, content: '抱歉，生成被中断或发生错误。' } : m))
+          );
+          toast.error('生成失败', {
+            description: '网络或服务异常，稍后可重试。',
+            action: {
+              label: '重试',
+              onClick: () => {
+                if (lastPrompt) {
+                  setInput(lastPrompt);
+                  sendMessage(lastPrompt);
+                }
+              }
+            }
+          });
+        }
+      } finally {
+        setIsSending(false);
+        abortCtrlRef.current = null;
+        abortedByUserRef.current = false;
+      }
+    },
+    [isSending, lastPrompt]
+  );
+
+  // 停止当前流式生成
+  const stopStreaming = useCallback(() => {
+    // 移动端震动反馈（若支持）
+    if (isMobile) {
+      try {
+        const nav = navigator as Navigator & { vibrate?: (pattern: number | number[]) => boolean };
+        nav.vibrate?.([20, 30, 20]);
+      } catch {
+        // 忽略不支持或被拒绝的情况
+      }
+    }
+    abortedByUserRef.current = true;
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = null;
+    }
+    abortCtrlRef.current?.abort();
+    abortCtrlRef.current = null;
+    setIsSending(false);
+    setMessages(prev => prev.map(m => (m.streaming ? { ...m, streaming: false } : m)));
+    toast.info('已停止生成');
+  }, [isMobile]);
+
+  // 处理表单提交
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    sendMessage(input);
   };
 
+  // 开始新会话
+  const startNewSession = () => {
+    setMessages([]);
+    setCurrentSessionId(null);
+    setInput('');
+    setLastError(null);
+  };
+
+  // 复制消息
+  const copyMessage = (content: string) => {
+    navigator.clipboard.writeText(content);
+    toast.success('已复制到剪贴板');
+  };
+
+  // 重新生成消息
   const regenerateMessage = (messageId: string) => {
     const messageIndex = messages.findIndex(m => m.id === messageId);
-    if (messageIndex === -1) return;
-    
-    // 找到对应的用户消息
-    const userMessage = messages[messageIndex - 1];
-    if (userMessage && userMessage.role === 'user') {
-      // 删除从助手消息开始的所有后续消息
-      const newMessages = messages.slice(0, messageIndex);
-      setMessages(newMessages);
-      
-      // 重新发送用户消息
-      setInput(userMessage.content);
-      setTimeout(() => onSend(), 100);
+    if (messageIndex === -1 || messageIndex === 0) return;
+
+    const previousMessage = messages[messageIndex - 1];
+    if (previousMessage.role === 'user') {
+      // 删除当前消息及之后的所有消息
+      setMessages(prev => prev.slice(0, messageIndex));
+      // 重新发送上一条用户消息
+      sendMessage(previousMessage.content);
     }
   };
 
-  // 输入框快捷键处理
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey && !isSending) {
-      e.preventDefault();
-      onSend();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      if (isSending) {
-        stopStreaming();
-      } else {
-        setInput('');
-      }
+  // 滚动到底部
+  const scrollToBottom = () => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   };
+
+  // 监听滚动位置
+  useEffect(() => {
+    const scrollElement = scrollRef.current;
+    if (!scrollElement) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = scrollElement;
+      const threshold = 80; // 提升底部阈值，减少误判
+      const isAtBottom = scrollTop + clientHeight >= scrollHeight - threshold;
+      setAtBottom(isAtBottom);
+    };
+
+    scrollElement.addEventListener('scroll', handleScroll);
+    return () => scrollElement.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // 自动滚动到底部：靠近底部或用户刚发送时
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    const userJustSent = !!last && last.role === 'user';
+    if (atBottom || userJustSent) {
+      scrollToBottom();
+    }
+  }, [messages, atBottom]);
+
+  if (!hasConversation) {
+    return (
+      <div className='fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 pt-20 sm:pt-20 md:pt-24 lg:pt-24 xl:pt-24 2xl:pt-24 pb-20 sm:pb-24 md:pb-28 lg:pb-10 xl:pb-8 2xl:pb-8 min-h-screen'>
+        <Header
+          title='AI 伴侣'
+          leftIcon={
+            <button
+              onClick={() => setShowHistory(true)}
+              aria-label='历史会话'
+              className='p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors'>
+              <Menu className='w-5 h-5' />
+            </button>
+          }
+          rightIcon={
+            <button
+              onClick={startNewSession}
+              aria-label='新建会话'
+              className='p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors'>
+              <Plus className='w-5 h-5' />
+            </button>
+          }
+        />
+
+        <NewSessionView onQuestionSubmit={sendMessage} onStartExercise={() => setShowExerciseDrawer(true)} />
+
+        {/* 历史会话抽屉 */}
+        <HistoryDrawer
+          isOpen={showHistory}
+          onClose={() => setShowHistory(false)}
+          sessions={sessions}
+          currentSessionId={currentSessionId}
+          onSessionSelect={setCurrentSessionId}
+          onNewSession={startNewSession}
+        />
+
+        {/* 疏导练习抽屉 */}
+        <ExerciseDrawer
+          isOpen={showExerciseDrawer}
+          onClose={() => setShowExerciseDrawer(false)}
+          onStartBreath={(seconds, pace) => {
+            setBreathParams({ totalSeconds: seconds, pace });
+            setShowBreath(true);
+          }}
+          onStartReframe={() => setShowReframe(true)}
+          onStartGrounding={initial => {
+            setGroundingInitial(initial);
+            setShowGrounding(true);
+          }}
+          onStartMindfulness={() => setShowMindfulness(true)}
+        />
+
+        {/* 练习弹窗 */}
+        {showBreath && breathParams && (
+          <BreathingGuide
+            onClose={() => setShowBreath(false)}
+            totalSeconds={breathParams.totalSeconds}
+            pace={breathParams.pace}
+          />
+        )}
+        {showReframe && <CognitiveReframe onClose={() => setShowReframe(false)} />}
+        {showGrounding && groundingInitial && (
+          <Grounding54321 onClose={() => setShowGrounding(false)} initialStepDuration={groundingInitial} />
+        )}
+        {showMindfulness && <MindfulnessMeditation onClose={() => setShowMindfulness(false)} />}
+      </div>
+    );
+  }
 
   return (
-    <>
-      <Header title='AI 情绪疏导师' immersiveMode={immersiveMode} />
-      <Container className='pb-0 page-container'>
-        <div className='page-sections space-y-6'>
-          {/* 标签页导航（对齐设置页样式） */}
-          <Card variant='default' padding='sm' className='overflow-hidden p-2 sm:p-3'>
-            <div
-              role='tablist'
-              aria-label='导师功能切换'
-              aria-orientation='horizontal'
-              className='flex space-x-2 sm:space-x-3 lg:space-x-4 xl:space-x-5 2xl:space-x-6 overflow-x-auto scrollbar-hide p-1 snap-x snap-mandatory'>
+    <div className='fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 pt-20 sm:pt-20 md:pt-24 lg:pt-24 xl:pt-24 2xl:pt-24 pb-20 sm:pb-24 md:pb-28 lg:pb-10 xl:pb-8 2xl:pb-8'>
+      <Header
+        title='AI 伴侣'
+        leftIcon={
+          <button
+            onClick={() => setShowHistory(true)}
+            className='p-1.5 sm:p-2 rounded-xl bg-white/80 dark:bg-theme-gray-700/80 hover:bg-white dark:hover:bg-theme-gray-600 text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-all duration-200 hover:scale-110 active:scale-95 shadow-sm hover:shadow-md'
+            aria-label='历史会话'>
+            <Menu className='w-4 h-4 sm:w-5 sm:h-5' />
+          </button>
+        }
+        rightIcon={
+          <button
+            onClick={startNewSession}
+            className='p-1.5 sm:p-2 rounded-xl bg-white/80 dark:bg-theme-gray-700/80 hover:bg-white dark:hover:bg-theme-gray-600 text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-all duration-200 hover:scale-110 active:scale-95 shadow-sm hover:shadow-md'
+            aria-label='新建会话'>
+            <Plus className='w-4 h-4 sm:w-5 sm:h-5' />
+          </button>
+        }
+      />
+
+      <Container className='flex-1 flex flex-col min-h-0 px-0'>
+        {/* 错误提示 */}
+        {lastError && !isSending && (
+          <Card
+            variant='default'
+            padding='sm'
+            role='alert'
+            aria-live='assertive'
+            className='mb-3 sm:mb-4 mx-3 sm:mx-4 border border-red-200 dark:border-red-800 bg-red-50/60 dark:bg-red-900/20 flex-shrink-0'>
+            <div className='text-sm sm:text-base text-red-700 dark:text-red-300'>发生错误：{lastError}</div>
+            <div className='text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1'>
+              网络：{isOnline ? connectionType || 'unknown' : '离线'}
+            </div>
+            <div className='mt-2'>
               <button
-                role='tab'
-                aria-selected={activeTab === 'chat'}
-                onClick={() => setActiveTab('chat')}
-                className={`flex-1 flex flex-row items-center justify-center gap-2 px-3 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm lg:text-base xl:text-lg transition-all duration-200 min-w-0 font-semibold snap-start ${
-                  activeTab === 'chat'
-                    ? 'bg-purple-500 text-white shadow-lg transform scale-[1.02]'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-purple-900/30 hover:shadow-md hover:scale-[1.01]'
-                }`}>
-                <MessageSquare className='w-4 h-4 xl:w-5 xl:h-5 flex-shrink-0' />
-                <span className='text-sm sm:text-base lg:text-lg xl:text-xl font-bold truncate whitespace-nowrap'>
-                  AI 伴聊
-                </span>
-              </button>
-              <button
-                role='tab'
-                aria-selected={activeTab === 'exercises'}
-                onClick={() => setActiveTab('exercises')}
-                className={`flex-1 flex flex-row items-center justify-center gap-2 px-3 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm lg:text-base xl:text-lg transition-all duration-200 min-w-0 font-semibold snap-start ${
-                  activeTab === 'exercises'
-                    ? 'bg-purple-500 text-white shadow-lg transform scale-[1.02]'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-purple-900/30 hover:shadow-md hover:scale-[1.01]'
-                }`}>
-                <Fingerprint className='w-4 h-4 xl:w-5 xl:h-5 flex-shrink-0' />
-                <span className='text-sm sm:text-base lg:text-lg xl:text-xl font-bold truncate whitespace-nowrap'>
-                  疏导练习
-                </span>
+                onClick={() => {
+                  if (lastPrompt) {
+                    setInput(lastPrompt);
+                    sendMessage(lastPrompt);
+                  }
+                }}
+                className='px-2 sm:px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm rounded-lg transition-colors duration-200'>
+                重试
               </button>
             </div>
           </Card>
-          <div className='mt-4'></div>
-          {/* 根据标签页显示不同的布局 */}
-          {activeTab === 'exercises' && (
-            <div className='space-y-6'>
-              {/* 疏导练习区 */}
-              <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6'>
-                {/* 呼吸练习 */}
-                <Card variant='default' padding='md'>
-                  <div className='flex items-center justify-between mb-3'>
-                    <h3 className='text-lg lg:text-xl xl:text-2xl font-semibold text-gray-900 dark:text-gray-50'>
-                      呼吸练习
-                    </h3>
-                    <div className='flex items-center gap-2'>
-                      <StatusBadge status={exerciseStatus.breath} />
-                      <button
-                        onClick={() => toggleExercise('breath')}
-                        aria-expanded={exerciseOpen.breath}
-                        className='text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors'>
-                        {exerciseOpen.breath ? '收起' : '展开'}
-                      </button>
-                    </div>
-                  </div>
-                  {exerciseOpen.breath && (
-                    <>
-                      <p className='text-sm text-gray-700 dark:text-gray-200 mb-3'>
-                        通过节律呼吸快速调节身心，降低紧张与压力。
-                      </p>
-                      <div className='flex flex-wrap gap-2'>
-                        <button
-                          onClick={() => {
-                            setBreathParams({ totalSeconds: 180, pace: { inhale: 4, hold: 4, exhale: 6 } });
-                            markInProgress('breath');
-                            setShowBreath(true);
-                          }}
-                          className='h-9 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-500 active:scale-95'>
-                          启动 3 分钟呼吸
-                        </button>
-                        <button
-                          onClick={() => {
-                            setBreathParams({ totalSeconds: 300, pace: { inhale: 5, hold: 5, exhale: 7 } });
-                            markInProgress('breath');
-                            setShowBreath(true);
-                          }}
-                          className='h-9 px-3 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 dark:hover:bg-emerald-800/40 text-emerald-700 dark:text-emerald-200 text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-500 active:scale-95'>
-                          5 分钟·慢节律
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </Card>
-
-                {/* 正念冥想（调整至第二位） */}
-                <Card variant='default' padding='md'>
-                  <div className='flex items-center justify-between mb-3'>
-                    <h3 className='text-lg lg:text-xl xl:text-2xl font-semibold text-gray-900 dark:text-gray-50'>
-                      正念冥想
-                    </h3>
-                    <div className='flex items-center gap-2'>
-                      <StatusBadge status={exerciseStatus.mindfulness} />
-                      <button
-                        onClick={() => toggleExercise('mindfulness')}
-                        aria-expanded={exerciseOpen.mindfulness}
-                        className='text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors'>
-                        {exerciseOpen.mindfulness ? '收起' : '展开'}
-                      </button>
-                    </div>
-                  </div>
-                  {exerciseOpen.mindfulness && (
-                    <>
-                      <p className='text-sm text-gray-700 dark:text-gray-200 mb-3'>
-                        通过引导冥想培养当下觉察，提升情绪调节能力。
-                      </p>
-                      <button
-                        onClick={() => {
-                          markInProgress('mindfulness');
-                          setShowMindfulness(true);
-                        }}
-                        className='h-9 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-500 active:scale-95'>
-                        开始 10 分钟冥想
-                      </button>
-                    </>
-                  )}
-                </Card>
-
-                {/* 感官回归 */}
-                <Card variant='default' padding='md'>
-                  <div className='flex items-center justify-between mb-3'>
-                    <h3 className='text-lg lg:text-xl xl:text-2xl font-semibold text-gray-900 dark:text-gray-50'>
-                      感官回归
-                    </h3>
-                    <div className='flex items-center gap-2'>
-                      <StatusBadge status={exerciseStatus.grounding} />
-                      <button
-                        onClick={() => toggleExercise('grounding')}
-                        aria-expanded={exerciseOpen.grounding}
-                        className='text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-theme-gray-700 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-theme-gray-600 transition-colors'>
-                        {exerciseOpen.grounding ? '收起' : '展开'}
-                      </button>
-                    </div>
-                  </div>
-                  {exerciseOpen.grounding && (
-                    <>
-                      <p className='text-sm text-gray-700 dark:text-gray-200 mb-3'>
-                        通过感官觉察快速回到当下，缓解焦虑与恐慌。
-                      </p>
-                      <div className='flex flex-wrap gap-2'>
-                        <button
-                          onClick={() => {
-                            setGroundingInitial(15);
-                            markInProgress('grounding');
-                            setShowGrounding(true);
-                          }}
-                          className='h-9 px-3 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-teal-300 dark:focus:ring-teal-500 active:scale-95'>
-                          快速版 (15秒)
-                        </button>
-                        <button
-                          onClick={() => {
-                            setGroundingInitial(30);
-                            markInProgress('grounding');
-                            setShowGrounding(true);
-                          }}
-                          className='h-9 px-3 rounded-lg bg-teal-100 dark:bg-teal-900/30 hover:bg-teal-200 dark:hover:bg-teal-800/40 text-teal-700 dark:text-teal-200 text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-teal-300 dark:focus:ring-teal-500 active:scale-95'>
-                          标准版 (30秒)
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </Card>
-
-                {/* 认知重构（调整至第四位） */}
-                <Card variant='default' padding='md'>
-                  <div className='flex items-center justify-between mb-3'>
-                    <h3 className='text-lg lg:text-xl xl:text-2xl font-semibold text-gray-900 dark:text-gray-50'>
-                      认知重构
-                    </h3>
-                    <div className='flex items-center gap-2'>
-                      <StatusBadge status={exerciseStatus.reframe} />
-                      <button
-                        onClick={() => toggleExercise('reframe')}
-                        aria-expanded={exerciseOpen.reframe}
-                        className='text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors'>
-                        {exerciseOpen.reframe ? '收起' : '展开'}
-                      </button>
-                    </div>
-                  </div>
-                  {exerciseOpen.reframe && (
-                    <>
-                      <p className='text-sm text-gray-700 dark:text-gray-200 mb-3'>
-                        识别自动化想法，生成更平衡的替代陈述，缓解负面情绪。
-                      </p>
-                      <button
-                        onClick={() => {
-                          markInProgress('reframe');
-                          setShowReframe(true);
-                        }}
-                        className='h-9 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-500 active:scale-95'>
-                        开始认知重构
-                      </button>
-                    </>
-                  )}
-                </Card>
-
-                {/* 情绪日记（暂时隐藏） */}
-                {JOURNAL_ENABLED && (
-                  <Card variant='default' padding='md'>
-                    <div className='flex items-center justify-between mb-3'>
-                      <h3 className='text-lg lg:text-xl xl:text-2xl font-semibold text-gray-900 dark:text-gray-50'>
-                        情绪日记
-                      </h3>
-                      <div className='flex items-center gap-2'>
-                        <StatusBadge status={exerciseStatus.journal} />
-                        <button
-                          onClick={() => toggleExercise('journal')}
-                          aria-expanded={exerciseOpen.journal}
-                          className='text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-theme-gray-700 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-theme-gray-600 transition-colors'>
-                          {exerciseOpen.journal ? '收起' : '展开'}
-                        </button>
-                      </div>
-                    </div>
-                    {exerciseOpen.journal && (
-                      <>
-                        <p className='text-sm text-gray-700 dark:text-gray-200 mb-3'>
-                          记录当前情绪状态，识别触发因素和应对策略。
-                        </p>
-                        <button
-                          onClick={() => {
-                            markInProgress('journal');
-                            setShowEmotionJournal(true);
-                          }}
-                          className='h-9 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 active:scale-95'>
-                          写情绪日记
-                        </button>
-                      </>
-                    )}
-                  </Card>
-                )}
-              </div>
-
-              {/* 安全与免责声明 */}
-              <Card variant='default' padding='md'>
-                <div className='flex items-center gap-2 text-red-600 mb-2'>
-                  <ShieldAlert className='w-4 h-4 sm:w-5 sm:h-5' />
-                  <span className='text-sm sm:text-base font-semibold'>安全与免责声明</span>
-                </div>
-                <p className='text-sm sm:text-base text-gray-500 leading-relaxed'>
-                  本页面提供一般性自助支持与练习，不构成医疗建议。若你处于危机或有自伤他伤等紧急风险，请立即联系当地专业医疗或心理咨询机构。
-                </p>
-              </Card>
-            </div>
-          )}
-        </div>
-
-        {/* 右侧：对话区（仅在 AI 伴聊标签显示） */}
-        {activeTab === 'chat' && (
-          <div className='space-y-6'>
-            {lastError && !isSending && (
-              <Card
-                variant='default'
-                padding='sm'
-                role='alert'
-                aria-live='assertive'
-                className='border border-red-200 dark:border-red-800 bg-red-50/60 dark:bg-red-900/20'>
-                <div className='text-sm sm:text-base text-red-700 dark:text-red-300'>发生错误：{lastError}</div>
-                <div className='text-sm text-gray-500 dark:text-gray-400 mt-1'>
-                  网络：{isOnline ? connectionType || 'unknown' : '离线'}
-                </div>
-                <div className='mt-2'>
-                  <Button
-                    variant='primary'
-                    size='sm'
-                    onClick={() => {
-                      if (lastPrompt) {
-                        setInput(lastPrompt);
-                        onSend();
-                      }
-                    }}
-                  >
-                    重试
-                  </Button>
-                </div>
-              </Card>
-            )}
-            <Card
-              id='chat-card'
-              variant='default'
-              padding='md'
-              className={
-                hasConversation
-                  ? 'relative flex-1 min-h-[55svh] sm:min-h-[60svh] lg:min-h-[420px]'
-                  : 'relative mx-auto w-full min-h-[220px]'
-              }>
-              <div
-                ref={scrollRef}
-                id='chat-log'
-                role='log'
-                aria-live='polite'
-                aria-relevant='additions'
-                aria-busy={isSending || messages.some(m => m.streaming)}
-                className={
-                  (hasConversation
-                    ? 'h-[55svh] sm:h-[60svh] lg:h-[62svh] xl:h-[56svh] 2xl:h-[52svh] overflow-y-auto overscroll-y-contain chat-scroll-container'
-                    : 'h-auto max-h-[40vh] overflow-y-visible flex items-center justify-center px-2 sm:px-3 lg:px-4 xl:px-6') +
-                  ' pr-1 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent scroll-container'
-                }>
-                {hasConversation ? (
-                  <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
-                    {rowVirtualizer.getVirtualItems().map(item => (
-                      <div
-                        key={messages[item.index].id}
-                        data-index={item.index}
-                        ref={rowVirtualizer.measureElement}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          transform: `translateY(${item.start}px)`
-                        }}
-                      >
-                        <div className='mb-3 sm:mb-4'>
-                          <MessageItem
-                            m={messages[item.index]}
-                            hasConversation={hasConversation}
-                            onStartBreath={(sec, pace) => {
-                              setBreathParams({ totalSeconds: sec, pace });
-                              setShowBreath(true);
-                            }}
-                            onStartReframe={() => setShowReframe(true)}
-                            onStartGrounding={initial => {
-                              setGroundingInitial(initial);
-                              setShowGrounding(true);
-                            }}
-                            onCopyMessage={copyMessage}
-                            onRegenerateMessage={regenerateMessage}
-                            hoveredMessageId={hoveredMessageId}
-                            onMessageHover={setHoveredMessageId}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  messages.map(m => (
+        )}
+        {/* 聊天区域 */}
+        <Card
+          variant='default'
+          padding='md'
+          className='flex-1 flex flex-col min-h-0 mb-3 relative mx-2 sm:mx-4 lg:mx-0 xl:mx-0'>
+          <div
+            id='chat-log'
+            ref={scrollRef}
+            role='log'
+            aria-live='polite'
+            aria-relevant='additions'
+            aria-busy={isSending || messages.some(m => m.streaming)}
+            className='flex-1 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent min-h-0'>
+            <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
+              {rowVirtualizer.getVirtualItems().map(item => (
+                <div
+                  key={messages[item.index].id}
+                  data-index={item.index}
+                  ref={rowVirtualizer.measureElement}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${item.start}px)`
+                  }}>
+                  <div className='mb-3 sm:mb-4'>
                     <MessageItem
-                      key={m.id}
-                      m={m}
+                      m={messages[item.index]}
                       hasConversation={hasConversation}
                       onStartBreath={(sec, pace) => {
                         setBreathParams({ totalSeconds: sec, pace });
@@ -1679,247 +1584,125 @@ const Mentor: React.FC = () => {
                         setGroundingInitial(initial);
                         setShowGrounding(true);
                       }}
+                      onStartMindfulness={() => setShowMindfulness(true)}
                       onCopyMessage={copyMessage}
                       onRegenerateMessage={regenerateMessage}
                       hoveredMessageId={hoveredMessageId}
                       onMessageHover={setHoveredMessageId}
                     />
-                  ))
-                )}
-              </div>
-              {hasConversation && !atBottom && (
-                <div className='absolute bottom-4 right-4'>
-                  <Button
-                    variant='primary'
-                    size='sm'
-                    aria-label='回到最新消息'
-                    aria-controls='chat-log'
-                    onClick={() => {
-                      const el = scrollRef.current;
-                      if (!el) return;
-                      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-                      setAtBottom(true);
-                    }}
-                  >
-                    回到底部
-                  </Button>
-                </div>
-              )}
-            </Card>
-
-            {/* 已将“预计剩余”合并至消息内的“正在生成...”区域 */}
-
-            
-
-            <div className='flex flex-col sm:flex-row items-stretch sm:items-center'>
-              <Card variant='default' padding='sm' className='flex-1 min-w-0 order-1 sm:order-none relative'>
-                <div className='relative'>
-                  <textarea
-                    ref={inputRef}
-                    rows={2}
-                    value={input}
-                    onChange={e => {
-                      const v = e.target.value;
-                      setInput(v);
-                      adjustInputHeight();
-                    }}
-                    onKeyDown={handleKeyDown}
-                    onFocus={handleInputFocus}
-                    placeholder='分享你的想法、感受，或任何想说的话...'
-                    className={`w-full bg-white/80 dark:bg-gray-800/90 outline-none text-sm xl:text-base placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-600 rounded-md px-3 py-2 xl:px-4 xl:py-3 transition-all duration-200 border border-gray-200 dark:border-gray-700 shadow-sm focus:shadow-md resize-none overflow-y-auto min-h-[64px] max-h-[240px] pr-12 ${isKeyboardOpen ? 'fixed-input' : ''}`}
-                    disabled={isSending}
-                  />
-                  {/* 输入提示 */}
-                  {!input && !isSending && (
-                    <div className='absolute bottom-2 right-2 text-xs text-gray-400 dark:text-gray-500 pointer-events-none'>
-                      <span className='hidden sm:inline'>Enter 发送 • Shift+Enter 换行 • Esc 清空</span>
-                      <span className='sm:hidden'>点击发送</span>
-                    </div>
-                  )}
-                  {/* 字数统计 */}
-                  {input.length > 0 && (
-                    <div className='absolute top-2 right-2 text-xs text-gray-400 dark:text-gray-500 bg-white/80 dark:bg-gray-800/80 px-2 py-1 rounded backdrop-blur-sm'>
-                      {input.length}/2000
-                    </div>
-                  )}
-                </div>
-                {/* 输入区操作按钮：左侧“停止/重试”，右侧“发送”；移动端堆叠显示 */}
-                <div className='mt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3' style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-                  <div className='flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full'>
-                    {isSending && (
-                      <button
-                        onClick={stopStreaming}
-                        aria-label='停止生成'
-                        aria-controls='chat-log'
-                        className='w-full sm:w-auto h-11 sm:h-12 xl:h-12 px-3 sm:px-4 xl:px-5 py-2.5 sm:py-3 xl:py-3.5 rounded-2xl bg-gradient-to-r from-red-100 to-red-50 dark:from-red-900/30 dark:to-red-800/20 hover:from-red-200 hover:to-red-100 dark:hover:from-red-800/40 dark:hover:to-red-700/30 text-red-700 dark:text-red-300 font-medium flex items-center justify-center gap-2 transition-all duration-300 hover:scale-105 hover:shadow-md focus:outline-none focus:ring-3 focus:ring-red-300/50 dark:focus:ring-red-600/50 active:scale-95 text-sm sm:text-base xl:text-lg border border-red-200/50 dark:border-red-700/30 min-w-[70px] sm:min-w-[80px] xl:min-w-[90px]'>
-                        <div className='w-2 h-2 xl:w-2.5 xl:h-2.5 bg-red-500 rounded-sm' />
-                        <span className='hidden xs:inline sm:inline'>停止</span>
-                      </button>
-                    )}
-                    {lastError && lastPrompt && !isSending && (
-                      <button
-                        onClick={() => {
-                          setInput(lastPrompt);
-                          onSend();
-                        }}
-                        className='w-full sm:w-auto h-11 sm:h-12 xl:h-12 px-3 sm:px-4 xl:px-5 py-2.5 sm:py-3 xl:py-3.5 rounded-2xl bg-gradient-to-r from-amber-100 to-yellow-50 dark:from-amber-900/30 dark:to-yellow-800/20 hover:from-amber-200 hover:to-yellow-100 dark:hover:from-amber-800/40 dark:hover:to-yellow-700/30 text-amber-700 dark:text-amber-300 font-medium transition-all duration-300 hover:scale-105 hover:shadow-md focus:outline-none focus:ring-3 focus:ring-amber-300/50 dark:focus:ring-amber-600/50 active:scale-95 text-sm sm:text-base xl:text-lg border border-amber-200/50 dark:border-amber-700/30 flex items-center justify-center gap-2 min-w-[70px] sm:min-w-[80px] xl:min-w-[90px]'>
-                        <div className='w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin' />
-                        <span className='hidden xs:inline sm:inline'>重试</span>
-                      </button>
-                    )}
                   </div>
-                  <button
-                    onClick={onSend}
-                    disabled={isSending}
-                    aria-disabled={isSending}
-                    aria-label='发送消息'
-                    aria-controls='chat-log'
-                    className='w-full sm:w-auto group relative h-11 sm:h-12 xl:h-12 px-4 sm:px-5 xl:px-6 py-2.5 sm:py-3 xl:py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-purple-500/25 focus:outline-none focus:ring-3 focus:ring-purple-500/50 active:scale-95 flex items-center justify-center gap-2 min-w-[100px] sm:min-w-[110px] xl:min-w-[140px] whitespace-nowrap'>
-                    {isSending ? (
-                      <>
-                        <div className='w-4 h-4 xl:w-5 xl:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin motion-reduce:animate-none' />
-                        <span className='text-sm sm:text-base xl:text-lg font-medium whitespace-nowrap'>发送中...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Send className='w-4 h-4 sm:w-5 sm:h-5 xl:w-6 xl:h-6 transition-transform group-hover:translate-x-0.5' />
-                        <span className='text-sm sm:text-base xl:text-lg font-medium whitespace-nowrap'>发送</span>
-                      </>
-                    )}
-                    {/* 发送按钮光效 */}
-                    <div className='absolute inset-0 rounded-2xl bg-gradient-to-r from-purple-400/0 via-white/20 to-purple-400/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none' />
-                  </button>
                 </div>
-              </Card>
-
-              <div className='flex items-center justify-center sm:justify-start gap-2 sm:gap-3 flex-shrink-0 order-2 sm:order-none'></div>
+              ))}
             </div>
-
-            {/* 预设问题：输入框下方常驻，可折叠，分组展示 */}
-            <Card variant='default' padding='sm' className='overflow-hidden border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 shadow-sm hover:shadow-md transition-all duration-300'>
-              <div className='flex items-center justify-between'>
-                <div className='flex items-center gap-2'>
-                  <span className='text-lg'>💭</span>
-                  <div className='text-sm sm:text-base font-medium text-gray-700 dark:text-gray-300'>快速开始对话</div>
-                </div>
-                <button
-                  onClick={() => setPresetOpen(prev => !prev)}
-                  aria-expanded={presetOpen}
-                  className='flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-all duration-200 font-medium'>
-                  {presetOpen ? '收起' : '展开'}
-                  <span className={cn('transition-transform duration-200', presetOpen ? 'rotate-180' : '')}>
-                    ▼
-                  </span>
-                </button>
-              </div>
-              <div
-                className={cn(
-                  'mt-3 transition-all duration-300 ease-in-out overflow-hidden',
-                  presetOpen ? 'max-h-[900px] opacity-100' : 'max-h-0 opacity-0'
-                )}
-                aria-hidden={!presetOpen}>
-                <div className='grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4'>
-                  {presetGroups.map(group => (
-                    <div key={group.label} className='rounded-xl p-3 sm:p-4 bg-white/60 dark:bg-gray-700/60 border border-gray-200 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600 transition-all duration-200 shadow-sm hover:shadow-md'>
-                      <div className='flex items-center gap-2 mb-3 pb-2 border-b border-gray-200 dark:border-gray-600'>
-                        <span
-                          className={cn(
-                            'inline-flex items-center justify-center w-6 h-6 rounded-lg text-sm select-none shadow-sm',
-                            group.accentClasses.bg,
-                            group.accentClasses.text
-                          )}>
-                          {group.icon}
-                        </span>
-                        <span className={cn('text-sm font-semibold', group.accentClasses.text)}>
-                          {group.label}
-                        </span>
-                      </div>
-                      <div
-                        role='group'
-                        aria-label={`${group.label} 预设问题`}
-                        className='space-y-2'>
-                        {group.items.map((q, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => sendPreset(q)}
-                            disabled={isSending}
-                            className='w-full text-left p-2.5 rounded-lg text-sm bg-white/80 dark:bg-gray-600/80 hover:bg-purple-50 dark:hover:bg-purple-900/30 text-gray-700 dark:text-gray-300 hover:text-purple-700 dark:hover:text-purple-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-300 dark:focus:ring-purple-600 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed border border-gray-200 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600 shadow-sm hover:shadow-md group'>
-                            <div className='flex items-start gap-2'>
-                              <span className='text-purple-500 dark:text-purple-400 mt-0.5 group-hover:scale-110 transition-transform duration-200'>
-                                💬
-                              </span>
-                              <span className='flex-1 leading-relaxed'>
-                                {q}
-                              </span>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </Card>
-
-
-            {/* 移动端安全声明 */}
-            <Card variant='default' padding='sm' className='xl:hidden'>
-              <div className='flex items-center gap-2 text-red-600 mb-2'>
-                <ShieldAlert className='w-4 h-4 sm:w-5 sm:h-5' />
-                <span className='text-sm sm:text-base font-semibold'>安全与免责声明</span>
-              </div>
-              <p className='text-sm sm:text-base text-gray-500 leading-relaxed'>
-                本页面提供一般性自助支持与练习，不构成医疗建议。若你处于危机或有自伤他伤等紧急风险，请立即联系当地专业医疗或心理咨询机构。
-              </p>
-            </Card>
           </div>
-        )}
+
+          {/* 滚动到底部按钮 */}
+          {!atBottom && (
+            <div className='absolute bottom-3 sm:bottom-4 right-3 sm:right-4'>
+              <button
+                onClick={scrollToBottom}
+                title='滚动到底部'
+                aria-label='滚动到底部'
+                className='p-2 sm:p-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-lg transition-colors duration-200'>
+                <svg className='w-4 h-4 sm:w-5 sm:h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 14l-7 7m0 0l-7-7m7 7V3' />
+                </svg>
+              </button>
+            </div>
+          )}
+          {/* 免责声明（移动到聊天卡片底部） */}
+          {messages.some(msg => msg.role === 'assistant') && (
+            <div className='text-center mt-2 flex-shrink-0'>
+              <p className='text-xs text-gray-500 dark:text-gray-400'>内容由 AI 生成，不构成医疗建议</p>
+            </div>
+          )}
+        </Card>
+
+        {/* 输入区域 - 固定在底部 */}
+        <Card className='flex-shrink-0 px-3 sm:px-4 pb-3 sm:pb-4 mx-2 sm:mx-4 lg:mx-0 xl:mx-0'>
+          <form onSubmit={handleSubmit} className='flex gap-2 sm:gap-3'>
+            <input
+              type='text'
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  if (isSending) {
+                    stopStreaming();
+                  } else {
+                    setInput('');
+                  }
+                }
+              }}
+              placeholder='输入您的问题或想法...'
+              disabled={isSending}
+              className='flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 disabled:opacity-50 text-sm sm:text-base'
+            />
+            {isSending && (
+              <button
+                type='button'
+                onClick={stopStreaming}
+                aria-label='停止生成'
+                aria-controls='chat-log'
+                className='p-2.5 sm:p-3 bg-red-600 hover:bg-red-700 text-white rounded-xl transition-colors duration-200 flex items-center gap-2'>
+                <div className='w-2 h-2 bg-white/90 rounded-sm' />
+                <span className='hidden xs:inline sm:inline text-sm'>停止</span>
+              </button>
+            )}
+            <button
+              type='submit'
+              title='发送'
+              aria-label='发送'
+              disabled={!input.trim() || isSending}
+              className='p-2.5 sm:p-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white rounded-xl transition-colors duration-200 disabled:cursor-not-allowed flex-shrink-0'>
+              <Send className='w-4 h-4 sm:w-5 sm:h-5' />
+            </button>
+          </form>
+        </Card>
+        {/* 免责声明已移动到聊天卡片底部 */}
       </Container>
 
-      {showBreath && (
+      {/* 历史会话抽屉 */}
+      <HistoryDrawer
+        isOpen={showHistory}
+        onClose={() => setShowHistory(false)}
+        sessions={sessions}
+        currentSessionId={currentSessionId}
+        onSessionSelect={setCurrentSessionId}
+        onNewSession={startNewSession}
+      />
+
+      {/* 疏导练习抽屉 */}
+      <ExerciseDrawer
+        isOpen={showExerciseDrawer}
+        onClose={() => setShowExerciseDrawer(false)}
+        onStartBreath={(seconds, pace) => {
+          setBreathParams({ totalSeconds: seconds, pace });
+          setShowBreath(true);
+        }}
+        onStartReframe={() => setShowReframe(true)}
+        onStartGrounding={initial => {
+          setGroundingInitial(initial);
+          setShowGrounding(true);
+        }}
+        onStartMindfulness={() => setShowMindfulness(true)}
+      />
+
+      {/* 练习弹窗 */}
+      {showBreath && breathParams && (
         <BreathingGuide
-          onClose={() => {
-            setShowBreath(false);
-            markIdle('breath');
-          }}
-          totalSeconds={breathParams?.totalSeconds}
-          pace={breathParams?.pace}
+          onClose={() => setShowBreath(false)}
+          totalSeconds={breathParams.totalSeconds}
+          pace={breathParams.pace}
         />
       )}
-      {showReframe && (
-        <CognitiveReframe
-          onClose={() => {
-            setShowReframe(false);
-            markIdle('reframe');
-          }}
-        />
+      {showReframe && <CognitiveReframe onClose={() => setShowReframe(false)} />}
+      {showGrounding && groundingInitial && (
+        <Grounding54321 onClose={() => setShowGrounding(false)} initialStepDuration={groundingInitial} />
       )}
-      {showGrounding && (
-        <Grounding54321
-          onClose={() => {
-            setShowGrounding(false);
-            markIdle('grounding');
-          }}
-          initialStepDuration={groundingInitial ?? 10}
-        />
-      )}
-      {showMindfulness && (
-        <MindfulnessMeditation
-          onClose={() => {
-            setShowMindfulness(false);
-            markIdle('mindfulness');
-          }}
-        />
-      )}
-      {JOURNAL_ENABLED && showEmotionJournal && (
-        <EmotionJournal
-          onClose={() => {
-            setShowEmotionJournal(false);
-            markIdle('journal');
-          }}
-        />
-      )}
-    </>
+      {showMindfulness && <MindfulnessMeditation onClose={() => setShowMindfulness(false)} />}
+    </div>
   );
 };
 

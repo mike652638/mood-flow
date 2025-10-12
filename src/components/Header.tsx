@@ -1,4 +1,4 @@
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, HeartHandshake, Home, PenTool, BarChart3, Settings } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Container from './Container';
 import { isNative } from '../utils/capacitor';
@@ -9,19 +9,29 @@ interface HeaderProps {
   onBack?: () => void;
   className?: string;
   immersiveMode?: boolean;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
 }
 
-const Header = ({ title, showBackButton = false, onBack, className = '', immersiveMode = false }: HeaderProps) => {
+const Header = ({
+  title,
+  showBackButton = false,
+  onBack,
+  className = '',
+  immersiveMode = false,
+  leftIcon,
+  rightIcon
+}: HeaderProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const nativeImmersive = immersiveMode && isNative();
 
   const navItems = [
-    { path: '/home', label: '首页' },
-    { path: '/record', label: '记录' },
-    { path: '/mentor', label: 'AI 伴聊' },
-    { path: '/analytics', label: '分析' },
-    { path: '/settings', label: '设置管理' }
+    { path: '/home', label: '首页', icon: <Home className='w-4 h-4' /> },
+    { path: '/record', label: '记录', icon: <PenTool className='w-4 h-4' /> },
+    { path: '/mentor', label: 'AI 伴侣', icon: <HeartHandshake className='w-4 h-4' /> },
+    { path: '/analytics', label: '分析', icon: <BarChart3 className='w-4 h-4' /> },
+    { path: '/settings', label: '设置管理', icon: <Settings className='w-4 h-4' /> }
   ];
 
   const handleBack = () => {
@@ -39,16 +49,17 @@ const Header = ({ title, showBackButton = false, onBack, className = '', immersi
       } ${isNative() ? 'safe-area-header' : ''} header-gradient ${className}`}>
       <Container preset='wide' spacing='tight' className={`pb-4 pt-2 ${nativeImmersive ? 'pt-2' : ''}`}>
         <div className='flex items-center justify-between'>
-          {/* 左侧：返回按钮或占位 */}
+          {/* 左侧：返回按钮或自定义图标或占位 */}
           <div className='w-10 h-10 flex items-center justify-center flex-shrink-0'>
-            {showBackButton && (
-              <button
-                onClick={handleBack}
-                className='p-2 rounded-xl bg-white/80 dark:bg-theme-gray-700/80 hover:bg-white dark:hover:bg-theme-gray-600 text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-all duration-200 hover:scale-110 active:scale-95 shadow-sm hover:shadow-md'
-                aria-label='返回'>
-                <ArrowLeft size={20} />
-              </button>
-            )}
+            {leftIcon ||
+              (showBackButton && (
+                <button
+                  onClick={handleBack}
+                  className='p-2 rounded-xl bg-white/80 dark:bg-theme-gray-700/80 hover:bg-white dark:hover:bg-theme-gray-600 text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-all duration-200 hover:scale-110 active:scale-95 shadow-sm hover:shadow-md'
+                  aria-label='返回'>
+                  <ArrowLeft size={20} />
+                </button>
+              ))}
           </div>
 
           {/* 中间：页面标题 - 添加异形屏适配 */}
@@ -61,9 +72,9 @@ const Header = ({ title, showBackButton = false, onBack, className = '', immersi
             </h1>
           </div>
 
-          {/* 右侧：桌面端导航（lg+）与移动端占位 */}
+          {/* 右侧：桌面端导航（lg+）与移动端占位或自定义图标 */}
           <div className='hidden lg:flex items-center space-x-1'>
-            {navItems.map(({ path, label }) => {
+            {navItems.map(({ path, label, icon }) => {
               // 当访问根路径 '/' 时，首页按钮也应该显示为激活状态
               const isActive = location.pathname === path || (path === '/home' && location.pathname === '/');
               return (
@@ -75,12 +86,17 @@ const Header = ({ title, showBackButton = false, onBack, className = '', immersi
                       ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-700 dark:text-purple-300 border-purple-300/50 dark:border-purple-600/50 shadow-sm'
                       : 'text-gray-600 dark:text-gray-300 border-transparent hover:text-purple-600 dark:hover:text-purple-300 hover:bg-white/70 dark:hover:bg-theme-gray-700/50 hover:border-white/40'
                   }`}>
-                  {label}
+                  <span className='inline-flex items-center gap-1.5'>
+                    {icon}
+                    <span>{label}</span>
+                  </span>
                 </Link>
               );
             })}
+            {/* 桌面端显示右侧自定义按钮（如新建会话） */}
+            <div className='ml-2'>{rightIcon}</div>
           </div>
-          <div className='w-10 h-10 lg:hidden'></div>
+          <div className='w-10 h-10 lg:hidden flex items-center justify-center'>{rightIcon}</div>
         </div>
       </Container>
     </header>

@@ -957,3 +957,15 @@ body {
     margin-top: 3rem; /* 48px */
   }
 }
+/* 轻微渐变闪动动画，用于主行动按钮背景 */
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}

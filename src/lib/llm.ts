@@ -27,17 +27,6 @@ const getConfig = () => {
   const envBaseUrl = import.meta.env.VITE_DEEPSEEK_BASE_URL;
   const envModel = import.meta.env.VITE_DEEPSEEK_MODEL;
 
-  // 在开发环境下输出调试信息
-  if (import.meta.env.DEV) {
-    console.log('[DeepSeek Config Debug]', {
-      runtime: runtime,
-      envApiKey: envApiKey ? `${envApiKey.substring(0, 8)}...` : 'undefined',
-      envBaseUrl: envBaseUrl,
-      envModel: envModel,
-      isNative: typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.()
-    });
-  }
-
   return {
     BASE_URL: runtime.DEEPSEEK_BASE_URL || envBaseUrl || 'https://api.deepseek.com',
     API_KEY: runtime.DEEPSEEK_API_KEY || envApiKey || '',
@@ -179,7 +168,7 @@ function buildMessages(messages: ChatMessage[], systemPrompt?: string) {
 // 提示工程模板：个性化约束与输出要求
 export function buildMentorSystemPrompt(params: { avg7d: number; mostMood: string; todayCount: number }): string {
   return [
-    '你是一位温暖、稳重的 AI 情绪疏导师。',
+    '你是一位温暖、稳重的 AI 伴侣。',
     '请遵循：',
     '1) 不提供医疗诊断或治疗承诺；使用一般性健康建议。',
     '2) 优先给出可执行的短练习（呼吸、正念、认知重构、grounding）。',

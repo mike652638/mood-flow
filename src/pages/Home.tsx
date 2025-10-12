@@ -13,7 +13,7 @@ import {
   Moon,
   Shuffle,
   Settings as SettingsIcon,
-  MessageSquare
+  HeartHandshake
 } from 'lucide-react';
 import Card from '../components/Card';
 import Container from '../components/Container';
@@ -442,9 +442,8 @@ const Home = () => {
                 })}
 
                 {mockTodayRecords.length > 2 && (
-                  <div
-                    className='block text-center text-sm text-purple-600 dark:text-purple-400 font-semibold py-3 px-6 bg-purple-50 dark:bg-purple-900/20 rounded-2xl border border-purple-200/50 dark:border-purple-700/50 opacity-60 cursor-not-allowed'>
-                    即将上线：AI 情绪疏导师
+                  <div className='block text-center text-sm text-purple-600 dark:text-purple-400 font-semibold py-3 px-6 bg-purple-50 dark:bg-purple-900/20 rounded-2xl border border-purple-200/50 dark:border-purple-700/50 opacity-60 cursor-not-allowed'>
+                    即将上线：AI 伴侣
                   </div>
                 )}
               </div>
@@ -482,9 +481,9 @@ const Home = () => {
                     }`}></div>
 
                   {/* 选中时的光晕效果 */}
-                    {selectedMood === mood.type && (
-                      <div className='absolute inset-0 bg-gradient-to-br from-purple-400/10 via-transparent to-purple-600/10 dark:from-purple-500/10 dark:via-transparent dark:to-purple-700/10 animate-pulse'></div>
-                    )}
+                  {selectedMood === mood.type && (
+                    <div className='absolute inset-0 bg-gradient-to-br from-purple-400/10 via-transparent to-purple-600/10 dark:from-purple-500/10 dark:via-transparent dark:to-purple-700/10 animate-pulse'></div>
+                  )}
 
                   {/* 表情符号 */}
                   <div className='relative z-10 mb-1 xs:mb-1.5 sm:mb-2 md:mb-2.5 lg:mb-3'>
@@ -511,9 +510,9 @@ const Home = () => {
                   </div>
 
                   {/* 选中指示器 */}
-                    {selectedMood === mood.type && (
-                      <div className='absolute top-1 xs:top-2 sm:top-3 right-1 xs:right-2 sm:right-3 w-2 xs:w-3 sm:w-4 h-2 xs:h-3 sm:h-4 bg-gradient-to-br from-purple-500 to-purple-600 dark:from-purple-400 dark:to-purple-500 rounded-full shadow-xl shadow-purple-500/50 dark:shadow-purple-400/50 animate-pulse border-2 border-white/80 dark:border-theme-gray-800/80'></div>
-                    )}
+                  {selectedMood === mood.type && (
+                    <div className='absolute top-1 xs:top-2 sm:top-3 right-1 xs:right-2 sm:right-3 w-2 xs:w-3 sm:w-4 h-2 xs:h-3 sm:h-4 bg-gradient-to-br from-purple-500 to-purple-600 dark:from-purple-400 dark:to-purple-500 rounded-full shadow-xl shadow-purple-500/50 dark:shadow-purple-400/50 animate-pulse border-2 border-white/80 dark:border-theme-gray-800/80'></div>
+                  )}
 
                   {/* 悬停指示器 */}
                   <div
@@ -593,12 +592,14 @@ const Home = () => {
                 <Link to='/mentor' className='block'>
                   <div className='flex flex-col items-center text-center'>
                     <div className='w-10 h-10 sm:w-12 sm:h-12 lg:w-16 lg:h-16 xl:w-20 xl:h-20 bg-purple-500 rounded-full flex items-center justify-center mb-3 sm:mb-4 lg:mb-6 group-hover:scale-110 transition-transform shadow-lg'>
-                      <MessageSquare className='w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 xl:w-10 xl:h-10 text-white' />
+                      <HeartHandshake className='w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 xl:w-10 xl:h-10 text-white' />
                     </div>
                     <h4 className='text-sm sm:text-base lg:text-lg xl:text-xl font-medium text-gray-800 dark:text-gray-200 mb-1 sm:mb-2 lg:mb-3'>
-                      AI 情绪疏导师
+                      AI 伴侣
                     </h4>
-                    <p className='text-xs sm:text-sm lg:text-base text-gray-600 dark:text-gray-400'>对话疏导与自助练习</p>
+                    <p className='text-xs sm:text-sm lg:text-base text-gray-600 dark:text-gray-400'>
+                      对话疏导与自助练习
+                    </p>
                   </div>
                 </Link>
               </Card>

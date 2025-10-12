@@ -28,12 +28,7 @@ import { rescheduleDailyReminder, ReminderOptions, requestReminderPermission } f
 import { Capacitor } from '@capacitor/core';
 import { supportsImmersiveStatusBar } from '../utils/capacitor';
 import { useUIStore } from '../store';
-import {
-  checkForUpdate,
-  UpdateCheckResult,
-  getAutoCheckEnabled,
-  setAutoCheckEnabled
-} from '../utils/update';
+import { checkForUpdate, UpdateCheckResult, getAutoCheckEnabled, setAutoCheckEnabled } from '../utils/update';
 import UpdateFlow from '../components/UpdateFlow';
 
 interface UserProfile {
@@ -113,7 +108,8 @@ const Settings = ({ immersiveMode = false, onImmersiveModeChange, onThemeChange 
           if (!cancelled && info?.version) setRuntimeVersion(info.version);
           if (!cancelled && info?.build != null) setRuntimeBuild(String(info.build));
         } else {
-          const injected = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : (import.meta.env.VITE_APP_VERSION as string);
+          const injected =
+            typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : (import.meta.env.VITE_APP_VERSION as string);
           if (!cancelled) setRuntimeVersion((injected || '1.0.0').trim());
         }
       } catch (err) {
@@ -494,7 +490,9 @@ const Settings = ({ immersiveMode = false, onImmersiveModeChange, onThemeChange 
                         : 'bg-gray-100 dark:bg-theme-gray-700 text-gray-600 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-purple-900/30 hover:shadow-md hover:scale-[1.01]'
                     }`}>
                     <Icon className='w-4 h-4 flex-shrink-0' />
-                    <span className='text-sm sm:text-base lg:text-lg xl:text-xl font-bold truncate whitespace-nowrap'>{tab.label}</span>
+                    <span className='text-sm sm:text-base lg:text-lg xl:text-xl font-bold truncate whitespace-nowrap'>
+                      {tab.label}
+                    </span>
                   </button>
                 );
               })}
@@ -1016,14 +1014,16 @@ const Settings = ({ immersiveMode = false, onImmersiveModeChange, onThemeChange 
                     </button>
                   </div>
                   <p className='mt-3 text-sm sm:text-base text-gray-600 dark:text-gray-400'>
-                    支持原生端 APK 升级与 Web 端提示，若检测到新版本，将显示版本说明与下载入口。
+                    支持移动设备 APP 升级，若检测到新版本，将显示版本说明与升级指引。
                   </p>
                   <div className='mt-3 sm:mt-4 flex items-center justify-between'>
                     <div>
                       <h5 className='font-medium text-sm sm:text-base text-gray-800 dark:text-gray-200'>
                         自动检查更新
                       </h5>
-                      <p className='text-xs sm:text-sm text-gray-600 dark:text-gray-400'>开机或回到前台时自动检测</p>
+                      <p className='text-xs sm:text-sm text-gray-600 dark:text-gray-400'>
+                        开启应用或回到前台时自动检测
+                      </p>
                     </div>
                     <label className='relative inline-flex items-center cursor-pointer' aria-label='自动检查更新'>
                       <input
@@ -1052,9 +1052,6 @@ const Settings = ({ immersiveMode = false, onImmersiveModeChange, onThemeChange 
                   </div>
 
                   <div className='space-y-3 sm:space-y-4'>
-
-                    
-
                     <div>
                       <p className='text-sm sm:text-base lg:text-lg text-gray-600 dark:text-gray-400 leading-relaxed'>
                         心流日记是一款专注于心理健康的应用，帮助用户记录和管理情绪，提供个性化的情绪分析和建议。

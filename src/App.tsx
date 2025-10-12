@@ -97,7 +97,7 @@ function App() {
     return () => subscription.unsubscribe();
   }, [setUser, logout, currentTheme]);
 
-  // 开机与回到前台自动检查更新（受设置开关控制）
+  // 开启应用与回到前台自动检查更新（受设置开关控制）
   useEffect(() => {
     const performAutoCheck = async () => {
       try {
@@ -152,8 +152,12 @@ function App() {
                   | { remove: () => Promise<void> };
                 // 使用类型收窄避免显式 any：判断是否为 Promise
                 const isPromise = (v: unknown): v is Promise<{ remove: () => Promise<void> }> => {
-                  return typeof v === 'object' && v !== null && 'then' in (v as Record<string, unknown>) &&
-                    typeof (v as Record<string, unknown>).then === 'function';
+                  return (
+                    typeof v === 'object' &&
+                    v !== null &&
+                    'then' in (v as Record<string, unknown>) &&
+                    typeof (v as Record<string, unknown>).then === 'function'
+                  );
                 };
                 if (isPromise(maybePromise)) {
                   (maybePromise as Promise<{ remove: () => Promise<void> }>).then(h => h.remove()).catch(() => {});

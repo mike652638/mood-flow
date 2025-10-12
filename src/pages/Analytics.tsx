@@ -934,7 +934,7 @@ const Analytics = () => {
                             key={day.toISOString()}
                             onClick={() => setHistorySelectedDate(day)}
                             className={cn(
-                              'relative min-h-[2rem] lg:min-h-[5rem] xl:min-h-[6rem] p-3 lg:p-4 xl:p-5 rounded-xl lg:rounded-2xl transition-all duration-300 border-2 transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-0',
+                              'relative min-h-[2.75rem] lg:min-h-[5rem] xl:min-h-[6rem] p-3 lg:p-4 xl:p-5 rounded-xl lg:rounded-2xl transition-all duration-300 border-2 transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-0',
                               !isSameMonth(day, historyCurrentDate) &&
                                 'bg-gray-50/50 dark:bg-theme-gray-800/50 text-gray-400 dark:text-gray-500 border-gray-100 dark:border-theme-gray-700 hover:bg-gray-100/70 dark:hover:bg-theme-gray-700/70',
                               isSameMonth(day, historyCurrentDate) &&
@@ -947,7 +947,7 @@ const Analytics = () => {
                                 !isSelected &&
                                 'bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 text-blue-700 dark:text-blue-300 border-blue-400 dark:border-blue-500 shadow-md ring-2 ring-blue-200 dark:ring-blue-700',
                               // 统一居中栈布局，避免日期数字在卡片内上下错位
-                              'flex flex-col items-center justify-center gap-1.5 lg:gap-2'
+                              'flex flex-col items-center justify-center gap-1 lg:gap-2'
                             )}>
                             <div
                               className={cn(
@@ -961,7 +961,7 @@ const Analytics = () => {
                               <span className='inline-block leading-none'>{format(day, 'd')}</span>
                             </div>
                             {dayRecords.length > 0 && (
-                              <div className='flex justify-center items-center space-x-1 lg:space-x-1.5'>
+                              <div className='flex justify-center items-center mt-0.5 space-x-0.5 sm:space-x-1 lg:space-x-1.5'>
                                 {dayRecords.slice(0, 3).map((record, index) => {
                                   const moodOption = getMoodOption(record.mood_type);
                                   return (
@@ -969,7 +969,7 @@ const Analytics = () => {
                                       key={index}
                                       className={cn(
                                         'rounded-full transition-all duration-200',
-                                        'w-2 h-2 lg:w-3 lg:h-3 xl:w-4 xl:h-4',
+                                        'w-1.5 h-1.5 sm:w-2 sm:h-2 lg:w-3 lg:h-3 xl:w-3.5 xl:h-3.5',
                                         isSelected
                                           ? 'bg-white/90 shadow-sm'
                                           : 'bg-purple-400 dark:bg-purple-500 hover:bg-purple-500 dark:hover:bg-purple-400'
@@ -981,8 +981,8 @@ const Analytics = () => {
                                 {dayRecords.length > 3 && (
                                   <div
                                     className={cn(
-                                      'font-medium leading-none ml-1.5 lg:ml-2',
-                                      'text-xs lg:text-sm xl:text-base',
+                                      'font-medium leading-none ml-1 lg:ml-1.5',
+                                      'text-[10px] sm:text-xs lg:text-sm xl:text-base',
                                       isSelected
                                         ? 'text-white/95 drop-shadow-sm'
                                         : 'text-purple-600 dark:text-purple-400'

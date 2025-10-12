@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, PenTool, BarChart3, Settings, Camera, Mic, MessageSquare } from 'lucide-react';
+import { Home, PenTool, BarChart3, Settings, Camera, Mic, HeartHandshake } from 'lucide-react';
 import { ImmersiveModeContext } from '../contexts/ImmersiveModeContext';
 import { isNative } from '../utils/capacitor';
 
@@ -23,7 +23,7 @@ const Layout = ({ immersiveMode = false, currentTheme = 'light' }: LayoutProps) 
     () => [
       { path: '/home', icon: Home, label: '首页' },
       { path: '/record', icon: PenTool, label: '记录' },
-      { path: '/mentor', icon: MessageSquare, label: 'AI 伴聊' },
+      { path: '/mentor', icon: HeartHandshake, label: 'AI 伴侣' },
       { path: '/analytics', icon: BarChart3, label: '分析' },
       { path: '/settings', icon: Settings, label: '设置' }
     ],
