@@ -152,10 +152,24 @@ const HistoryDrawer: React.FC<{
   return (
     <>
       {/* 遮罩层 */}
-      <div className='fixed inset-0 bg-black/50 z-40 transition-opacity duration-300' onClick={onClose} />
+      {/**
+       * 顶部避让：状态栏 + 固定 Header
+       * 通过 CSS 变量与 env(safe-area-inset-top) 计算偏移，避免与标题栏重叠遮挡
+       */}
+      <div
+        className='fixed left-0 right-0 bottom-0 bg-black/50 z-40 transition-opacity duration-300'
+        style={{
+          top: 'calc(max(env(safe-area-inset-top, 0px), var(--status-bar-height, 24px)) + var(--header-height, 56px))'
+        }}
+        onClick={onClose}
+      />
 
       {/* 抽屉内容 */}
-      <div className='fixed left-0 top-0 h-full w-80 bg-white dark:bg-gray-800 z-50 transform transition-transform duration-300 shadow-xl'>
+      <div
+        className='fixed left-0 bottom-0 w-80 bg-white dark:bg-gray-800 z-50 transform transition-transform duration-300 shadow-xl'
+        style={{
+          top: 'calc(max(env(safe-area-inset-top, 0px), var(--status-bar-height, 24px)) + var(--header-height, 56px))'
+        }}>
         <div className='flex flex-col h-full'>
           {/* 抽屉头部 */}
           <div className='flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700'>
@@ -279,7 +293,7 @@ const NewSessionView: React.FC<{
               type='text'
               value={inputValue}
               onChange={e => setInputValue(e.target.value)}
-              placeholder='输入您的问题或想法...'
+              placeholder='请输入您的问题或想法...'
               className='flex-1 px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400'
             />
             <button
@@ -1437,18 +1451,11 @@ const Mentor: React.FC = () => {
             <button
               onClick={() => setShowHistory(true)}
               aria-label='历史会话'
-              className='p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors'>
+              className='p-1.5 sm:p-2 rounded-xl bg-white/80 dark:bg-theme-gray-700/80 hover:bg-white dark:hover:bg-theme-gray-600 text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-all duration-200 hover:scale-110 active:scale-95 shadow-sm hover:shadow-md'>
               <Menu className='w-5 h-5' />
             </button>
           }
-          rightIcon={
-            <button
-              onClick={startNewSession}
-              aria-label='新建会话'
-              className='p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors'>
-              <Plus className='w-5 h-5' />
-            </button>
-          }
+          rightIcon={null}
         />
 
         <NewSessionView onQuestionSubmit={sendMessage} onStartExercise={() => setShowExerciseDrawer(true)} />
@@ -1518,7 +1525,7 @@ const Mentor: React.FC = () => {
         }
       />
 
-      <Container className='flex-1 flex flex-col min-h-0 px-0 pt-20 sm:pt-20 md:pt-24 lg:pt-24 xl:pt-24 2xl:pt-24'>
+      <Container className='flex-1 flex flex-col min-h-0 pt-20 sm:pt-20 md:pt-24 lg:pt-24 xl:pt-24 2xl:pt-24'>
         {/* 错误提示 */}
         {lastError && !isSending && (
           <Card
@@ -1619,7 +1626,7 @@ const Mentor: React.FC = () => {
         </Card>
 
         {/* 输入区域 - 固定在底部 */}
-        <Card className='flex-shrink-0 px-3 sm:px-4 pb-3 sm:pb-4'>
+        <Card className='flex-shrink-0 px-3 sm:px-4 !mb-4'>
           <form onSubmit={handleSubmit} className='flex gap-2 sm:gap-3'>
             <input
               type='text'
@@ -1635,7 +1642,7 @@ const Mentor: React.FC = () => {
                   }
                 }
               }}
-              placeholder='输入您的问题或想法...'
+              placeholder='请输入您的问题或想法...'
               disabled={isSending}
               className='flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 disabled:opacity-50 text-sm sm:text-base'
             />
@@ -1660,7 +1667,6 @@ const Mentor: React.FC = () => {
             </button>
           </form>
         </Card>
-        {/* 免责声明已移动到聊天卡片底部 */}
       </Container>
 
       {/* 历史会话抽屉 */}

@@ -142,7 +142,11 @@ export default function UpdateFlow({ url, onInstalled, className }: UpdateFlowPr
           className={`px-4 py-2 rounded-lg border text-white ${
             downloading ? 'bg-gray-400 cursor-wait' : 'bg-purple-600 hover:bg-purple-700'
           }`}>
-          {failed ? '重试下载' : downloading ? '正在下载...' : '前往更新'}
+          {failed
+            ? (isNative() ? '重试下载' : '前往更新')
+            : downloading
+            ? '正在下载...'
+            : (isNative() ? '下载并安装' : '前往更新')}
         </button>
       </div>
     </div>

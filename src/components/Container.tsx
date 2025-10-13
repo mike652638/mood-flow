@@ -44,7 +44,7 @@ const Container: React.FC<ContainerProps> = ({
     <div
       className={cn(
         // 水平内边距与居中
-        'container-base mx-auto px-3 sm:px-4 md:px-6 lg:px-8',
+        'container-base w-full sm:mx-auto px-3 sm:px-4 md:px-6 lg:px-8',
         widthClasses,
         spacingStyles[spacing],
         'pb-safe-area-inset-bottom',

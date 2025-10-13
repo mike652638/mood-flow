@@ -13,7 +13,7 @@ export const chatPresetGroups: PresetGroup[] = [
       bg: 'bg-teal-50 dark:bg-teal-900/20',
       text: 'text-teal-700 dark:text-teal-200'
     },
-    items: ['我有些焦虑，能引导我放松吗？', '请引导我做一次3分钟呼吸练习']
+    items: ['我有些焦虑，能帮助我放松吗？', '请引导我做一次3分钟呼吸练习']
   },
   {
     label: '认知重构',
