@@ -378,8 +378,8 @@ const MessageItem = React.memo(
       <div
         className={
           m.role === 'assistant'
-            ? `max-w-[98%] sm:max-w-[92%] md:max-w-[88%] lg:max-w-[85%] xl:max-w-[90%] 2xl:max-w-[92%] bg-gradient-to-br from-purple-50 to-purple-100/80 dark:from-purple-900/20 dark:to-purple-800/10 border border-purple-200/80 dark:border-purple-700/40 ring-1 ring-purple-100/50 dark:ring-purple-700/30 rounded-2xl p-3 sm:p-4 shadow-md hover:shadow-lg dark:shadow-purple-900/10 transition-all duration-300 animate-in slide-in-from-left-2 fade-in-0 relative group`
-            : `ml-auto max-w-[98%] sm:max-w-[92%] md:max-w-[88%] lg:max-w-[85%] xl:max-w-[90%] 2xl:max-w-[92%] bg-gradient-to-br from-blue-50 to-blue-100/80 dark:from-blue-900/20 dark:to-blue-800/10 border border-blue-200/80 dark:border-blue-700/40 ring-1 ring-blue-100/50 dark:ring-blue-700/30 rounded-2xl p-3 sm:p-4 shadow-md hover:shadow-lg dark:shadow-blue-900/10 transition-all duration-300 animate-in slide-in-from-right-2 fade-in-0 relative group`
+            ? `max-w-[100%] sm:max-w-[98%] md:max-w-[96%] lg:max-w-[94%] xl:max-w-[96%] 2xl:max-w-[98%] bg-gradient-to-br from-purple-50 to-purple-100/80 dark:from-purple-900/20 dark:to-purple-800/10 border border-purple-200/80 dark:border-purple-700/40 ring-1 ring-purple-100/50 dark:ring-purple-700/30 rounded-2xl p-3 sm:p-4 shadow-md hover:shadow-lg dark:shadow-purple-900/10 transition-all duration-300 animate-in slide-in-from-left-2 fade-in-0 relative group`
+            : `ml-auto max-w-[100%] sm:max-w-[98%] md:max-w-[96%] lg:max-w-[94%] xl:max-w-[96%] 2xl:max-w-[98%] bg-gradient-to-br from-blue-50 to-blue-100/80 dark:from-blue-900/20 dark:to-blue-800/10 border border-blue-200/80 dark:border-blue-700/40 ring-1 ring-blue-100/50 dark:ring-blue-700/30 rounded-2xl p-3 sm:p-4 shadow-md hover:shadow-lg dark:shadow-blue-900/10 transition-all duration-300 animate-in slide-in-from-right-2 fade-in-0 relative group`
         }
         onMouseEnter={() => onMessageHover?.(m.id)}
         onMouseLeave={() => onMessageHover?.(null)}>
@@ -1497,7 +1497,7 @@ const Mentor: React.FC = () => {
   }
 
   return (
-    <div className='fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 pt-20 sm:pt-20 md:pt-24 lg:pt-24 xl:pt-24 2xl:pt-24 pb-20 sm:pb-24 md:pb-28 lg:pb-10 xl:pb-8 2xl:pb-8'>
+    <div className='fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 pb-20 sm:pb-24 md:pb-28 lg:pb-10 xl:pb-8 2xl:pb-8'>
       <Header
         title='AI 伴侣'
         leftIcon={
@@ -1518,7 +1518,7 @@ const Mentor: React.FC = () => {
         }
       />
 
-      <Container className='flex-1 flex flex-col min-h-0 px-0'>
+      <Container className='flex-1 flex flex-col min-h-0 px-0 pt-20 sm:pt-20 md:pt-24 lg:pt-24 xl:pt-24 2xl:pt-24'>
         {/* 错误提示 */}
         {lastError && !isSending && (
           <Card
@@ -1549,7 +1549,7 @@ const Mentor: React.FC = () => {
         <Card
           variant='default'
           padding='md'
-          className='flex-1 flex flex-col min-h-0 mb-3 relative mx-2 sm:mx-4 lg:mx-0 xl:mx-0'>
+          className='flex-1 flex flex-col min-h-0 mb-3 relative sm:mx-4 lg:mx-0 xl:mx-0'>
           <div
             id='chat-log'
             ref={scrollRef}
@@ -1619,7 +1619,7 @@ const Mentor: React.FC = () => {
         </Card>
 
         {/* 输入区域 - 固定在底部 */}
-        <Card className='flex-shrink-0 px-3 sm:px-4 pb-3 sm:pb-4 mx-2 sm:mx-4 lg:mx-0 xl:mx-0'>
+        <Card className='flex-shrink-0 px-3 sm:px-4 pb-3 sm:pb-4'>
           <form onSubmit={handleSubmit} className='flex gap-2 sm:gap-3'>
             <input
               type='text'
