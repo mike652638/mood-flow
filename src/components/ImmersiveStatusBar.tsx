@@ -62,7 +62,8 @@ const ImmersiveStatusBar: React.FC<ImmersiveStatusBarProps> = ({
       document.documentElement.style.setProperty('--status-bar-height', `${finalStatusBar}px`);
       const headerHeight = 56;
       document.documentElement.style.setProperty('--header-height', `${headerHeight}px`);
-      const extraTop = immersive ? 8 : 0;
+      // 统一额外顶部留白：沉浸式为 8px，非沉浸为 4px，避免贴边
+      const extraTop = immersive ? 8 : 4;
       document.documentElement.style.setProperty('--safe-area-extra-top', `${extraTop}px`);
     } catch (error) {
       console.error('Failed to set status bar properties:', error);
@@ -155,6 +156,13 @@ const ImmersiveStatusBar: React.FC<ImmersiveStatusBarProps> = ({
           const styleByTop = luminance > 170 ? Style.Light : Style.Dark;
 
           await StatusBar.setStyle({ style: styleByTop });
+          // 同步更新 Header 高度，避免切换后首屏内容被遮挡
+          if (headerEl) {
+            const h = headerEl.offsetHeight;
+            if (Number.isFinite(h) && h > 0) {
+              root.style.setProperty('--header-height', `${h}px`);
+            }
+          }
         } else {
           const isDark =
             theme === 'dark' || (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -207,6 +215,14 @@ const ImmersiveStatusBar: React.FC<ImmersiveStatusBarProps> = ({
           await StatusBar.setBackgroundColor({ color: hex });
           await StatusBar.setStyle({ style: styleByBg });
           document.documentElement.style.setProperty('--status-bar-bg-color', nonImmersiveBg);
+          // 非沉浸模式：立即测量并更新 Header 高度变量，避免过大/过小
+          const headerEl = document.querySelector('header') as HTMLElement | null;
+          if (headerEl) {
+            const h = headerEl.offsetHeight;
+            if (Number.isFinite(h) && h > 0) {
+              root.style.setProperty('--header-height', `${h}px`);
+            }
+          }
         }
       } catch (error) {
         console.error('Failed to update status bar:', error);
@@ -214,6 +230,18 @@ const ImmersiveStatusBar: React.FC<ImmersiveStatusBarProps> = ({
     };
 
     updateStatusBar();
+    // 立即触发一次高度同步，避免首次或切换后等待定时器导致的间距异常
+    try {
+      const headerEl = document.querySelector('header') as HTMLElement | null;
+      if (headerEl) {
+        const h = headerEl.offsetHeight;
+        if (Number.isFinite(h) && h > 0) {
+          document.documentElement.style.setProperty('--header-height', `${h}px`);
+        }
+      }
+    } catch (error) {
+      console.error('Immediate header height sync failed:', error);
+    }
 
     // 监听窗口尺寸/方向变化，重新计算 Header 高度
     const resizeHandler = () => {

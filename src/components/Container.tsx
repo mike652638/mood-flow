@@ -7,6 +7,7 @@ interface ContainerProps {
   spacing?: 'tight' | 'normal' | 'loose';
   maxWidth?: 'sm' | 'md' | 'lg' | 'full';
   preset?: 'basic' | 'wide' | 'content';
+  style?: React.CSSProperties;
 }
 
 const Container: React.FC<ContainerProps> = ({
@@ -14,7 +15,8 @@ const Container: React.FC<ContainerProps> = ({
   className,
   spacing = 'normal',
   maxWidth = 'full',
-  preset = 'wide'
+  preset = 'wide',
+  style
 }) => {
   // 响应式间距映射（覆盖到 2xl）
   const spacingStyles: Record<NonNullable<ContainerProps['spacing']>, string> = {
@@ -42,6 +44,7 @@ const Container: React.FC<ContainerProps> = ({
 
   return (
     <div
+      style={style}
       className={cn(
         // 水平内边距与居中
         'container-base w-full sm:mx-auto px-3 sm:px-4 md:px-6 lg:px-8',

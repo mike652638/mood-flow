@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import {
-  Plus,
   Calendar,
   TrendingUp,
   Heart,
@@ -13,7 +12,9 @@ import {
   Moon,
   Shuffle,
   Settings as SettingsIcon,
-  HeartHandshake
+  HeartHandshake,
+  PenTool,
+  BarChart3
 } from 'lucide-react';
 import Card from '../components/Card';
 import Container from '../components/Container';
@@ -575,7 +576,7 @@ const Home = () => {
                 <Link to='/record' className='block'>
                   <div className='flex flex-col items-center text-center'>
                     <div className='w-10 h-10 sm:w-12 sm:h-12 lg:w-16 lg:h-16 xl:w-20 xl:h-20 bg-purple-500 rounded-full flex items-center justify-center mb-3 sm:mb-4 lg:mb-6 group-hover:scale-110 transition-transform shadow-lg'>
-                      <Plus className='w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 xl:w-10 xl:h-10 text-white' />
+                      <PenTool className='w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 xl:w-10 xl:h-10 text-white' />
                     </div>
                     <h4 className='text-sm sm:text-base lg:text-lg xl:text-xl font-medium text-gray-800 dark:text-gray-200 mb-1 sm:mb-2 lg:mb-3'>
                       详细记录
@@ -611,7 +612,7 @@ const Home = () => {
                 <Link to='/analytics' className='block'>
                   <div className='flex flex-col items-center text-center'>
                     <div className='w-10 h-10 sm:w-12 sm:h-12 lg:w-16 lg:h-16 xl:w-20 xl:h-20 bg-green-500 rounded-full flex items-center justify-center mb-3 sm:mb-4 lg:mb-6 group-hover:scale-110 transition-transform shadow-lg'>
-                      <TrendingUp className='w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 xl:w-10 xl:h-10 text-white' />
+                      <BarChart3 className='w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 xl:w-10 xl:h-10 text-white' />
                     </div>
                     <h4 className='text-sm sm:text-base lg:text-lg xl:text-xl font-medium text-gray-800 dark:text-gray-200 mb-1 sm:mb-2 lg:mb-3'>
                       趋势分析

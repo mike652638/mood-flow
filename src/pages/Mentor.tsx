@@ -159,7 +159,7 @@ const HistoryDrawer: React.FC<{
       <div
         className='fixed left-0 right-0 bottom-0 bg-black/50 z-40 transition-opacity duration-300'
         style={{
-          top: 'calc(max(env(safe-area-inset-top, 0px), var(--status-bar-height, 24px)) + var(--header-height, 56px))'
+          top: 'var(--header-height, 56px)'
         }}
         onClick={onClose}
       />
@@ -168,7 +168,7 @@ const HistoryDrawer: React.FC<{
       <div
         className='fixed left-0 bottom-0 w-80 bg-white dark:bg-gray-800 z-50 transform transition-transform duration-300 shadow-xl'
         style={{
-          top: 'calc(max(env(safe-area-inset-top, 0px), var(--status-bar-height, 24px)) + var(--header-height, 56px))'
+          top: 'var(--header-height, 56px)'
         }}>
         <div className='flex flex-col h-full'>
           {/* 抽屉头部 */}
@@ -1444,7 +1444,13 @@ const Mentor: React.FC = () => {
 
   if (!hasConversation) {
     return (
-      <div className='fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 pt-20 sm:pt-20 md:pt-24 lg:pt-24 xl:pt-24 2xl:pt-24 pb-20 sm:pb-24 md:pb-28 lg:pb-10 xl:pb-8 2xl:pb-8 min-h-screen'>
+      <div
+        className='fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 pb-20 sm:pb-24 md:pb-28 lg:pb-10 xl:pb-8 2xl:pb-8 min-h-screen'
+        style={{
+          paddingTop:
+            'calc(max(env(safe-area-inset-top, 0px), var(--status-bar-height, 24px)) + var(--header-height, 56px))'
+        }}
+      >
         <Header
           title='AI 伴侣'
           leftIcon={
@@ -1525,7 +1531,13 @@ const Mentor: React.FC = () => {
         }
       />
 
-      <Container className='flex-1 flex flex-col min-h-0 pt-20 sm:pt-20 md:pt-24 lg:pt-24 xl:pt-24 2xl:pt-24'>
+      <Container
+        className='flex-1 flex flex-col min-h-0'
+        style={{
+          paddingTop:
+            'calc(max(env(safe-area-inset-top, 0px), var(--status-bar-height, 24px)) + var(--header-height, 56px))'
+        }}
+      >
         {/* 错误提示 */}
         {lastError && !isSending && (
           <Card

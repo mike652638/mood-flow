@@ -13,6 +13,7 @@ const Layout = ({ immersiveMode = false, currentTheme = 'light' }: LayoutProps) 
   const location = useLocation();
   const navigate = useNavigate();
   const nativeImmersive = immersiveMode && isNative();
+  const native = isNative();
 
   // refs for positioning quick actions above the "record" item
   const recordRef = useRef<HTMLAnchorElement | null>(null);
@@ -98,7 +99,7 @@ const Layout = ({ immersiveMode = false, currentTheme = 'light' }: LayoutProps) 
         {/* 主内容区域 - 为固定顶部导航栏留出空间（沉浸模式在原生端按状态栏+Header预留，Web端保持旧的固定值） */}
         <main
           className={`${
-            nativeImmersive ? 'pt-safe-area-and-header' : 'pt-20 sm:pt-20 md:pt-24 lg:pt-24 xl:pt-24 2xl:pt-24'
+            native ? 'pt-safe-area-and-header' : 'pt-20 sm:pt-20 md:pt-24 lg:pt-24 xl:pt-24 2xl:pt-24'
           } pb-24 sm:pb-28 md:pb-32 lg:pb-12 xl:pb-10 fade-in`}>
           <Outlet />
         </main>

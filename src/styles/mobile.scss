@@ -254,7 +254,7 @@ select {
 .pt-safe-area-top-fallback {
   /* 改为使用可调的安全区额外顶部留白，避免在沉浸模式下标题被挖孔遮挡 */
   padding-top: calc(
-    max(env(safe-area-inset-top, 0px), var(--status-bar-height, 24px)) + var(--safe-area-extra-top, 8px)
+    max(env(safe-area-inset-top, 0px), var(--status-bar-height, 24px)) + var(--safe-area-extra-top, 4px)
   );
 }
 
