@@ -252,7 +252,7 @@ const NewSessionView: React.FC<{
   return (
     <div className='flex flex-col h-full min-h-0'>
       {/* 主要内容区域 - 可滚动 */}
-      <div className='flex-1 flex flex-col justify-center px-4 pb-8 min-h-0 overflow-y-auto'>
+      <div className='flex-1 flex flex-col justify-center px-4 pb-8 min-h-0 overflow-y-auto pt-20 lg:pt-0 md:pt-8 sm:pt-4'>
         {/* AI 头像 */}
         <AIAvatar />
 
@@ -1445,12 +1445,11 @@ const Mentor: React.FC = () => {
   if (!hasConversation) {
     return (
       <div
-        className='fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 pb-20 sm:pb-24 md:pb-28 lg:pb-10 xl:pb-8 2xl:pb-8 min-h-screen'
+        className='fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 pb-20 sm:pb-24 md:pb-28 lg:pb-10 xl:pb-8 2xl:pb-8 min-h-screen pt-4'
         style={{
           paddingTop:
             'calc(max(env(safe-area-inset-top, 0px), var(--status-bar-height, 24px)) + var(--header-height, 56px))'
-        }}
-      >
+        }}>
         <Header
           title='AI 伴侣'
           leftIcon={
@@ -1510,7 +1509,7 @@ const Mentor: React.FC = () => {
   }
 
   return (
-    <div className='fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 pb-20 sm:pb-24 md:pb-28 lg:pb-10 xl:pb-8 2xl:pb-8'>
+    <div className='fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 pb-20 sm:pb-24 md:pb-28 lg:pb-10 xl:pb-8 2xl:pb-8 pt-4'>
       <Header
         title='AI 伴侣'
         leftIcon={
@@ -1536,8 +1535,7 @@ const Mentor: React.FC = () => {
         style={{
           paddingTop:
             'calc(max(env(safe-area-inset-top, 0px), var(--status-bar-height, 24px)) + var(--header-height, 56px))'
-        }}
-      >
+        }}>
         {/* 错误提示 */}
         {lastError && !isSending && (
           <Card

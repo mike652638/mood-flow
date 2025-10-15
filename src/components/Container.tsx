@@ -50,7 +50,7 @@ const Container: React.FC<ContainerProps> = ({
         'container-base w-full sm:mx-auto px-3 sm:px-4 md:px-6 lg:px-8',
         widthClasses,
         spacingStyles[spacing],
-        'pb-safe-area-inset-bottom',
+        // 移除默认的底部安全区内边距，避免与页面级 main 的叠加造成过大留白
         className
       )}>
       {children}

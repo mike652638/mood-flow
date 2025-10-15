@@ -22,6 +22,7 @@ const Record = lazy(() => import('./pages/Record'));
 const Analytics = lazy(() => import('./pages/Analytics'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Mentor = lazy(() => import('./pages/Mentor'));
+const DownloadPage = lazy(() => import('./pages/Download'));
 
 function App() {
   const { user, setUser, logout } = useAuthStore();
@@ -249,10 +250,12 @@ function App() {
               </Route>
               <Route path='/terms' element={<Terms />} />
               <Route path='/privacy' element={<Privacy />} />
+              <Route path='/download' element={<DownloadPage />} />
               <Route path='*' element={<Navigate to='/' replace />} />
             </Routes>
           ) : (
             <Routes>
+              <Route path='/download' element={<DownloadPage />} />
               <Route path='/login' element={<Login />} />
               <Route path='/register' element={<Register />} />
               <Route path='/forgot-password' element={<ForgotPassword />} />

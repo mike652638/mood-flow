@@ -44,10 +44,10 @@ const Header = ({
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b border-white/20 dark:border-theme-gray-700/30 shadow-lg transition-all duration-300 pb-2 ${
-        nativeImmersive ? 'pt-safe-area-top-fallback' : 'pt-2'
+      className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b border-white/20 dark:border-theme-gray-700/30 shadow-lg transition-all duration-300 ${
+        nativeImmersive ? 'pt-safe-area-top-fallback' : 'pt-0'
       } ${isNative() ? 'safe-area-header' : ''} header-gradient ${className}`}>
-      <Container preset='wide' spacing='tight' className={`pb-4 pt-2`}>
+      <Container preset='wide' spacing='tight' className={`py-2`}>
         <div className='flex items-center justify-between'>
           {/* 左侧：返回按钮或自定义图标或占位 */}
           <div className='w-10 h-10 flex items-center justify-center flex-shrink-0'>
@@ -65,7 +65,7 @@ const Header = ({
           {/* 中间：页面标题 - 添加异形屏适配 */}
           <div className={`flex-1 text-center ${isNative() ? 'notch-safe-title' : ''}`}>
             <h1
-              className={`text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-400 dark:to-pink-400 bg-clip-text text-transparent truncate ${
+              className={`text-base sm:text-lg leading-6 sm:leading-7 font-bold bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-400 dark:to-pink-400 bg-clip-text text-transparent truncate ${
                 nativeImmersive ? 'max-w-[60%] mx-auto' : ''
               }`}>
               {title}

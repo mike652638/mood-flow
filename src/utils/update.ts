@@ -49,7 +49,10 @@ export async function checkForUpdate(customUrl?: string): Promise<UpdateCheckRes
   const current = await getCurrentVersion();
   // 开发环境禁用在线更新检查，避免本地调试时的网络中断/Abort 报错
   if (import.meta.env && (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) {
-    return { currentVersion: current, info: undefined, hasUpdate: false, sourceUrl: '/updates.json' };
+    // 如果明确提供了自定义远程源（如 R2），则在开发环境也允许使用该远程源进行检查
+    if (!customUrl) {
+      return { currentVersion: current, info: undefined, hasUpdate: false, sourceUrl: '/updates.json' };
+    }
   }
   const envObj = (import.meta as unknown as { env?: { VITE_APP_UPDATE_URL?: string; VITE_APP_UPDATES_BASE?: string } }).env;
   const envUrl = envObj?.VITE_APP_UPDATE_URL as string | undefined;

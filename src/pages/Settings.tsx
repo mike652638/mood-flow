@@ -168,61 +168,9 @@ const Settings = ({ immersiveMode = false, onImmersiveModeChange, onThemeChange 
     }));
   }, [uiTheme, storeAutoEnabled, storeAutoStart, storeAutoEnd, storeFollowSystemTheme]);
 
-  // 自动切换模式：根据时间段自动应用深色/浅色（跟随系统开启时不生效）
-  useEffect(() => {
-    if (!settings.autoThemeEnabled || settings.followSystemTheme) {
-      return;
-    }
-
-    const toMinutes = (hhmm: string): number => {
-      const [h, m] = hhmm.split(':').map(v => parseInt(v, 10));
-      return h * 60 + m;
-    };
-
-    const nowToMinutes = (): number => {
-      const d = new Date();
-      return d.getHours() * 60 + d.getMinutes();
-    };
-
-    const inRange = (start: number, end: number, now: number): boolean => {
-      // 支持跨午夜的时间段，如 22:00 - 07:00
-      if (start <= end) {
-        return now >= start && now < end;
-      }
-      return now >= start || now < end;
-    };
-
-    const applyThemeByTime = () => {
-      const start = toMinutes(settings.autoThemeStart || '22:00');
-      const end = toMinutes(settings.autoThemeEnd || '07:00');
-      const now = nowToMinutes();
-      const shouldDark = inRange(start, end, now);
-      const target: 'light' | 'dark' = shouldDark ? 'dark' : 'light';
-
-      if ((target === 'dark' && !isDark) || (target === 'light' && isDark)) {
-        setTheme(target);
-        setUiTheme(target);
-        onThemeChange?.(target);
-      }
-      // 同步设置项中的显示状态（用于 UI 展示）
-      setSettings(prev => ({ ...prev, darkMode: target === 'dark' } as AppSettings));
-    };
-
-    // 立即应用一次
-    applyThemeByTime();
-    // 每分钟检查一次
-    const timer = setInterval(applyThemeByTime, 60 * 1000);
-    return () => clearInterval(timer);
-  }, [
-    settings.autoThemeEnabled,
-    settings.autoThemeStart,
-    settings.autoThemeEnd,
-    settings.followSystemTheme,
-    isDark,
-    setTheme,
-    setUiTheme,
-    onThemeChange
-  ]);
+  // 自动切换模式：交由 ThemeContext 统一管理，Settings 页面仅负责配置项
+  // 说明：ThemeContext 已基于 UI Store 的 autoThemeEnabled / followSystemTheme / themeMode
+  // 实现了按时间段与跟随系统的调度与应用，这里移除重复逻辑以避免循环更新。
 
   // 原生端：联动通知开关与提醒时间，调度每日提醒
   useEffect(() => {

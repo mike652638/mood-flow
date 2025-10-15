@@ -10,10 +10,7 @@ const Terms = () => {
   return (
     <>
       <Header title='服务条款' showBackButton={true} immersiveMode={immersiveMode} />
-      <Container
-        className={`${
-          immersiveMode ? 'pt-safe-area-and-header-policy' : 'pt-policy-pages-fallback'
-        }`}>
+      <Container className={`${immersiveMode ? 'pt-safe-area-and-header-policy' : 'pt-policy-pages-fallback'}`}>
         <div className='mb-4 space-y-6 lg:space-y-8 pt-4 sm:pt-6'>
           {/* 内容 */}
           <Card variant='default' padding='lg'>

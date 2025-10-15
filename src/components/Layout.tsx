@@ -13,7 +13,6 @@ const Layout = ({ immersiveMode = false, currentTheme = 'light' }: LayoutProps) 
   const location = useLocation();
   const navigate = useNavigate();
   const nativeImmersive = immersiveMode && isNative();
-  const native = isNative();
 
   // refs for positioning quick actions above the "record" item
   const recordRef = useRef<HTMLAnchorElement | null>(null);
@@ -46,6 +45,46 @@ const Layout = ({ immersiveMode = false, currentTheme = 'light' }: LayoutProps) 
     el.style.setProperty('--indicator-width', `${itemWidthPercent}%`);
     el.style.setProperty('--indicator-offset', `${(activeIndex < 0 ? 0 : activeIndex) * 100}%`);
   }, [itemWidthPercent, activeIndex]);
+
+  // 动态同步 Header 高度到 CSS 变量，确保顶部留白与实际头部高度一致
+  useEffect(() => {
+    const root = document.documentElement;
+    const headerEl = document.querySelector('header') as HTMLElement | null;
+
+    const updateHeaderHeight = () => {
+      const h = headerEl?.offsetHeight || 56;
+      if (Number.isFinite(h) && h > 0) {
+        root.style.setProperty('--header-height', `${h}px`);
+      }
+    };
+
+    // Web 环境无原生状态栏：显式归零，避免额外 24px 顶部留白
+    try {
+      root.style.setProperty('--status-bar-height', '0px');
+      // Web 端适度增加顶部额外留白，改善首屏呼吸感
+      root.style.setProperty('--safe-area-extra-top', '16px');
+    } catch (error) {
+      console.error('设置状态栏高度失败:', error);
+    }
+
+    // 初次设置
+    updateHeaderHeight();
+
+    // 监听尺寸变化
+    let ro: ResizeObserver | null = null;
+    if (headerEl && 'ResizeObserver' in window) {
+      ro = new ResizeObserver(() => updateHeaderHeight());
+      ro.observe(headerEl);
+    }
+
+    const onResize = () => updateHeaderHeight();
+    window.addEventListener('resize', onResize);
+
+    return () => {
+      window.removeEventListener('resize', onResize);
+      ro?.disconnect();
+    };
+  }, []);
 
   // 轻微震动反馈（支持的设备上）
   const handleNavClick = (e?: React.MouseEvent<HTMLAnchorElement> | React.TouchEvent<HTMLAnchorElement>) => {
@@ -96,11 +135,9 @@ const Layout = ({ immersiveMode = false, currentTheme = 'light' }: LayoutProps) 
   return (
     <ImmersiveModeContext.Provider value={{ immersiveMode, currentTheme }}>
       <div className={`min-h-screen bg-gradient-healing dark:bg-theme-gray-900 ${immersiveMode ? 'immersive' : ''}`}>
-        {/* 主内容区域 - 为固定顶部导航栏留出空间（沉浸模式在原生端按状态栏+Header预留，Web端保持旧的固定值） */}
+        {/* 主内容区域 - 为固定头部+安全区动态预留空间（Web 与原生统一）*/}
         <main
-          className={`${
-            native ? 'pt-safe-area-and-header' : 'pt-20 sm:pt-20 md:pt-24 lg:pt-24 xl:pt-24 2xl:pt-24'
-          } pb-24 sm:pb-28 md:pb-32 lg:pb-12 xl:pb-10 fade-in`}>
+          className={`pt-safe-area-and-header pb-safe-area-inset-bottom pb-extra-24 pb-extra-sm-28 pb-extra-md-32 pb-extra-lg-12 pb-extra-xl-10 fade-in`}>
           <Outlet />
         </main>
 
@@ -171,7 +208,7 @@ const Layout = ({ immersiveMode = false, currentTheme = 'light' }: LayoutProps) 
         {/* 二级快捷操作浮层（仅在长按"记录"时显示） */}
         {showQuick && (
           <div
-            className='fixed inset-0 z-[60] flex items-end justify-center pb-24 sm:pb-28 touch-optimized'
+            className='fixed inset-0 z-[60] flex items-end justify-center pb-safe-area-inset-bottom pb-extra-24 pb-extra-sm-28 touch-optimized'
             onContextMenu={e => e.preventDefault()}
             onClick={() => {
               setShowQuick(false);
