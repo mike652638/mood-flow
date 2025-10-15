@@ -1,4 +1,6 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 
 export interface ApkDownloadResult {
   ok: boolean;
@@ -16,13 +18,43 @@ type ApkUpdaterPlugin = {
 
 const ApkUpdater = registerPlugin<ApkUpdaterPlugin>('ApkUpdater');
 
+export function isApkUpdaterAvailable(): boolean {
+  try {
+    return Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('ApkUpdater');
+  } catch {
+    return false;
+  }
+}
+
+async function downloadApkViaFilesystem(url: string): Promise<ApkDownloadResult> {
+  try {
+    if (!Capacitor.isNativePlatform()) return { ok: false, error: 'Not native platform' };
+    const fileName = `mood-flow-update-${Date.now()}.apk`;
+    // 使用缓存目录，避免存储权限问题（Android 10+ 走 Scoped Storage）
+    await Filesystem.downloadFile({ url, path: fileName, directory: Directory.Cache });
+    const uri = await Filesystem.getUri({ path: fileName, directory: Directory.Cache });
+    return { ok: true, path: uri.uri };
+  } catch (err) {
+    console.warn('Filesystem download failed:', err);
+    return { ok: false, error: err };
+  }
+}
+
 export async function preDownloadApk(url: string): Promise<ApkDownloadResult> {
   if (!Capacitor.isNativePlatform()) {
     return { ok: false, error: 'Not native platform' };
   }
   try {
-    const res = await ApkUpdater.download({ url });
-    return { ok: !!res.ok, path: res.path, error: res.error };
+    if (isApkUpdaterAvailable()) {
+      const res = await ApkUpdater.download({ url });
+      if (res?.ok && res?.path) {
+        return { ok: true, path: res.path };
+      }
+      // 原生下载启动失败，切换到回退方案
+      return await downloadApkViaFilesystem(url);
+    }
+    // 回退：使用 Filesystem 下载到缓存目录，返回可用于分享/打开的 URI
+    return await downloadApkViaFilesystem(url);
   } catch (err) {
     return { ok: false, error: err };
   }
@@ -32,11 +64,15 @@ export async function preDownloadApk(url: string): Promise<ApkDownloadResult> {
 export async function installDownloadedApk(path: string): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) return false;
   try {
-    const res = await ApkUpdater.install({ path });
-    if (res?.requiresPermission) {
-      return false;
+    if (isApkUpdaterAvailable()) {
+      const res = await ApkUpdater.install({ path });
+      if (res?.requiresPermission) {
+        return false;
+      }
+      return !!res?.ok;
     }
-    return !!res?.ok;
+    // 简化：在非插件路径下不主动弹分享，避免后台静默预下载时打断用户
+    return false;
   } catch {
     return false;
   }
@@ -111,11 +147,21 @@ export function subscribeDownloadCompleted(handler: (e: { id?: number; path?: st
 
 export async function installDownloadedApkDetailed(
   path: string
-): Promise<{ ok: boolean; requiresPermission?: boolean }> {
+): Promise<{ ok: boolean; requiresPermission?: boolean; usedShareFallback?: boolean }> {
   if (!Capacitor.isNativePlatform()) return { ok: false };
   try {
-    const res = await ApkUpdater.install({ path });
-    return { ok: !!res?.ok, requiresPermission: !!res?.requiresPermission };
+    if (isApkUpdaterAvailable()) {
+      const res = await ApkUpdater.install({ path });
+      return { ok: !!res?.ok, requiresPermission: !!res?.requiresPermission };
+    }
+    // 回退：触发分享进行安装
+    try {
+      await Share.share({ title: '安装新版应用', text: '已下载最新版 APK，点击打开进行安装', url: path });
+      return { ok: true, usedShareFallback: true };
+    } catch (err) {
+      console.error('Share fallback install failed:', err);
+      return { ok: false };
+    }
   } catch (err) {
     console.error('Failed to install downloaded APK:', err);
     return { ok: false };

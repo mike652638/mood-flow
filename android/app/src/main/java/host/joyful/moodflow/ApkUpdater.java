@@ -39,7 +39,11 @@ public class ApkUpdater extends Plugin {
             req.setDescription(fileName);
             req.setAllowedOverMetered(true);
             req.setAllowedOverRoaming(true);
-            req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE);
+            req.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI | DownloadManager.Request.NETWORK_MOBILE);
+            req.setVisibleInDownloadsUi(true);
+            req.setMimeType("application/vnd.android.package-archive");
+            req.addRequestHeader("Accept", "*/*");
+            req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
             req.setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, fileName);
 
             long id = dm.enqueue(req);

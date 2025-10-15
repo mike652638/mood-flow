@@ -5,7 +5,8 @@ import {
   preDownloadApk,
   installDownloadedApkDetailed,
   subscribeDownloadProgress,
-  subscribeDownloadFailed
+  subscribeDownloadFailed,
+  isApkUpdaterAvailable
 } from '../utils/nativeUpdate';
 import { openUpdateLink } from '../utils/update';
 
@@ -58,17 +59,21 @@ export default function UpdateFlow({ url, onInstalled, className }: UpdateFlowPr
       setPercent(0);
       setDownloading(true);
 
-      const p = subscribeDownloadProgress(e => {
-        const total = Math.max(1, e.total ?? 0);
-        const downloaded = Math.max(0, e.downloaded ?? 0);
-        const pct = Math.min(100, Math.round((downloaded / total) * 100));
-        if (Number.isFinite(pct)) setPercent(pct);
-      });
-      const f = subscribeDownloadFailed(() => {
-        setFailed(true);
-        setDownloading(false);
-      });
-      subs.current.push(p, f);
+      const pluginAvailable = isApkUpdaterAvailable();
+
+      if (pluginAvailable) {
+        const p = subscribeDownloadProgress(e => {
+          const total = Math.max(1, e.total ?? 0);
+          const downloaded = Math.max(0, e.downloaded ?? 0);
+          const pct = Math.min(100, Math.round((downloaded / total) * 100));
+          if (Number.isFinite(pct)) setPercent(pct);
+        });
+        const f = subscribeDownloadFailed(() => {
+          setFailed(true);
+          setDownloading(false);
+        });
+        subs.current.push(p, f);
+      }
 
       const dl = await preDownloadApk(url);
       if (dl.ok && dl.path) {
@@ -111,22 +116,31 @@ export default function UpdateFlow({ url, onInstalled, className }: UpdateFlowPr
 
   const failureHint = (() => {
     if (!failed) return null;
-    if (netType === 'cellular') return '当前为蜂窝网络，下载可能较慢且消耗流量，建议在 Wi‑Fi 下重试。';
-    if (netType === 'wifi') return '下载失败，请检查 Wi‑Fi 网络或稍后重试。';
-    return '下载失败，请检查网络后重试。';
+    if (isApkUpdaterAvailable()) {
+      if (netType === 'cellular') return '当前为蜂窝网络，下载可能较慢且消耗流量，建议在 Wi‑Fi 下重试。';
+      if (netType === 'wifi') return '下载失败，请检查 Wi‑Fi 网络或稍后重试。';
+      return '下载失败，请检查网络后重试。';
+    }
+    return '内置下载不可用或失败，已为你打开系统浏览器进行下载。';
   })();
 
   return (
     <div className={className}>
       {downloading && (
         <div className='flex-1 min-w-[220px]'>
-          <div className='text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-1'>正在下载：{percent}%</div>
-          <div className='w-full h-2 bg-gray-200 dark:bg-theme-gray-800 rounded'>
-            <div
-              className='h-2 bg-purple-600 rounded transition-all duration-300'
-              style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
-            />
-          </div>
+          {isApkUpdaterAvailable() ? (
+            <>
+              <div className='text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-1'>正在下载：{percent}%</div>
+              <div className='w-full h-2 bg-gray-200 dark:bg-theme-gray-800 rounded'>
+                <div
+                  className='h-2 bg-purple-600 rounded transition-all duration-300'
+                  style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
+                />
+              </div>
+            </>
+          ) : (
+            <div className='text-xs sm:text-sm text-gray-600 dark:text-gray-400'>正在下载更新包，请稍候...</div>
+          )}
         </div>
       )}
       {permissionRequired && (

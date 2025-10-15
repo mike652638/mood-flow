@@ -49,7 +49,7 @@ const ImmersiveStatusBar: React.FC<ImmersiveStatusBarProps> = ({
       }
     }
 
-    // 根据设备实际状态栏高度设置变量（Android 回退）
+    // 根据设备实际状态栏高度设置变量（Android 回退）；非沉浸模式下不叠加状态栏高度
     try {
       const fallbackStatusBarHeight = 24;
       const testDiv = document.createElement('div');
@@ -59,7 +59,7 @@ const ImmersiveStatusBar: React.FC<ImmersiveStatusBarProps> = ({
       document.body.removeChild(testDiv);
       const envTopPx = parseFloat(computed || '0');
       const finalStatusBar = Number.isFinite(envTopPx) && envTopPx > 0 ? envTopPx : fallbackStatusBarHeight;
-      document.documentElement.style.setProperty('--status-bar-height', `${finalStatusBar}px`);
+      document.documentElement.style.setProperty('--status-bar-height', immersive ? `${finalStatusBar}px` : '0px');
       const headerHeight = 56;
       document.documentElement.style.setProperty('--header-height', `${headerHeight}px`);
       // 统一额外顶部留白：沉浸式为 8px，非沉浸为 4px，避免贴边

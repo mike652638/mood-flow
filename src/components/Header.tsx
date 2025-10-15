@@ -45,9 +45,9 @@ const Header = ({
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b border-white/20 dark:border-theme-gray-700/30 shadow-lg transition-all duration-300 pb-2 ${
-        isNative() ? 'pt-safe-area-top-fallback' : 'pt-2'
+        nativeImmersive ? 'pt-safe-area-top-fallback' : 'pt-2'
       } ${isNative() ? 'safe-area-header' : ''} header-gradient ${className}`}>
-      <Container preset='wide' spacing='tight' className={`pb-4 pt-2 ${nativeImmersive ? 'pt-2' : ''}`}>
+      <Container preset='wide' spacing='tight' className={`pb-4 pt-2`}>
         <div className='flex items-center justify-between'>
           {/* 左侧：返回按钮或自定义图标或占位 */}
           <div className='w-10 h-10 flex items-center justify-center flex-shrink-0'>

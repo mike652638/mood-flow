@@ -2,7 +2,7 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { supabase } from './lib/supabase';
-import { initializeApp, setImmersiveStatusBar, isNative } from './utils/capacitor';
+import { initializeApp, isNative } from './utils/capacitor';
 import { checkForUpdate, getAutoCheckEnabled } from './utils/update';
 import { preDownloadApk, installDownloadedApk } from './utils/nativeUpdate';
 import Modal from './components/Modal';
@@ -36,10 +36,7 @@ function App() {
       try {
         await initializeApp();
 
-        // 仅在原生环境默认启用沉浸式状态栏
-        if (isNative()) {
-          await setImmersiveStatusBar(currentTheme);
-        }
+        // 状态栏样式与沉浸开关由 ImmersiveStatusBar 组件统一管理，避免与主题切换产生冲突
       } catch (error) {
         console.error('App initialization error:', error);
       }
@@ -95,7 +92,7 @@ function App() {
     });
 
     return () => subscription.unsubscribe();
-  }, [setUser, logout, currentTheme]);
+  }, [setUser, logout]);
 
   // 开启应用与回到前台自动检查更新（受设置开关控制）
   useEffect(() => {

@@ -445,22 +445,49 @@ const Settings = ({ immersiveMode = false, onImmersiveModeChange, onThemeChange 
   };
 
   const handleLogout = async () => {
+    let hadSession = false;
     try {
-      // 先调用 Supabase 退出登录
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        throw error;
+      // 检查是否存在当前会话（避免无会话时调用全局注销导致 403）
+      const { data: sessionData } = await supabase.auth.getSession();
+      hadSession = !!sessionData?.session;
+
+      // 总是先清除本地会话，确保 UI 与路由能够立即跳转
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch (e) {
+        // 忽略本地清理错误（旧版 SDK 或浏览器异常）
+        console.warn('Local signOut failed, continue:', e);
       }
 
-      // 清除本地认证状态
-      logout();
-
-      // 跳转到登录页面
-      navigate('/login', { replace: true });
-      toast.success('已安全退出');
+      // 仅当确实存在会话时才尝试全局注销；若失败也不阻塞退出
+      if (hadSession) {
+        const { error } = await supabase.auth.signOut({ scope: 'global' });
+        if (error) {
+          // 在部分情况下（令牌过期/网络或服务端权限问题）会返回错误，记录后继续流程
+          console.warn('Global signOut failed, proceed anyway:', error);
+        }
+      }
     } catch (error) {
-      console.error('退出登录失败:', error);
-      toast.error('退出失败');
+      // getSession 失败或其他异常，不影响后续退出流程
+      console.warn('Logout pre-check failed:', error);
+    } finally {
+      // 清除本地认证状态并跳转，无论远端是否成功
+      try {
+        logout();
+      } catch (e) {
+        console.warn('Local store logout failed:', e);
+      }
+      try {
+        navigate('/login', { replace: true });
+      } catch (e) {
+        console.warn('Navigate to /login failed, fallback to location:', e);
+        try {
+          window.location.href = '/login';
+        } catch (e) {
+          console.warn('Fallback to /login failed:', e);
+        }
+      }
+      toast.success('已安全退出');
     }
   };
 
