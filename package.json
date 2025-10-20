@@ -11,7 +11,7 @@
     "check": "tsc --noEmit",
     "android:init": "npx cap add android",
     "android:sync": "npm run build && npx cap sync android",
-    "android:build": "npm run android:sync && npx cap build android",
+    "android:build": "npm run android:release:prepare && npm run android:sync && npx cap build android && node scripts/prepare-release-clean-server-url.cjs --mode restore",
     "android:open": "npx cap open android",
     "android:run": "npx cap run android",
     "mobile:build": "npm run build && npx cap sync",
@@ -23,6 +23,9 @@
     "android:debug:auto": "cmd /c .\\build-android.cmd",
     "android:aab:auto": "cmd /c .\\build-android.cmd aab",
     "android:release:auto": "cmd /c .\\build-android.cmd release",
+    "android:dev:wifi:auto": "node scripts/dev-android-wifi.cjs",
+    "android:dev:usb:auto": "node scripts/dev-android-usb.cjs",
+    "android:release:prepare": "node scripts/prepare-release-clean-server-url.cjs",
     "ci:push": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/ci-push-and-monitor.ps1",
     "ci:push:wait300": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/ci-push-and-monitor.ps1 -WaitSeconds 300"
   },

@@ -55,6 +55,86 @@ npx cap sync android
 cd android && ./gradlew assembleDebug
 ```
 
+## 🌐 开发热更新（Wi‑Fi / USB）自动化命令
+
+项目已提供一键化开发命令，自动更新 `capacitor.config.ts` 的 `server.url` 并启动（或复用）开发服务器，然后同步并运行到设备。发布前可一键移除该字段，使用打包静态资源。
+
+### 常用命令
+
+```bash
+# Wi‑Fi 开发（自动检测局域网 IP 并写入 server.url）
+npm run android:dev:wifi:auto
+
+# USB 直连开发（设置 server.url=localhost 并进行端口反向）
+npm run android:dev:usb:auto
+
+# 发布前清理（移除 server.url，改用 dist 静态资源）
+npm run android:release:prepare
+```
+
+### Wi‑Fi 开发热更新
+- 自动复用或启动本地开发服务器（默认 `http://<本机IP>:5173`）。
+- 写入 `capacitor.config.ts` 的 `server.url` 与 `server.cleartext=true`。
+- 同步并运行到连接的 Android 设备（`npx cap sync android && npx cap run android`）。
+- 验证建议：
+  - 手机与电脑在同一 Wi‑Fi 网段，能访问 `http://<本机IP>:5173/`。
+  - 首次运行如加载失败，检查防火墙是否放行 5173 端口。
+  - 修改前端代码后，手机端会即时热更新刷新。
+
+### USB 直连开发热更新
+- 将 `server.url` 设置为 `http://localhost:5173`，并开启 `cleartext`。
+- 执行 `adb reverse tcp:5173 tcp:5173` 完成端口反向。
+- 同步并运行到设备，适合在 Wi‑Fi 不稳定或受限环境下开发。
+- 验证建议：
+  - 电脑端本地访问 `http://localhost:5173/` 正常。
+  - Android 开发者选项中已开启 USB 调试并授权。
+
+### 发布前清理 server.url
+- 执行 `npm run android:release:prepare` 会“备份并注释” `server.url`（不移除），确保发布使用 `dist` 静态资源。
+- 一键构建（`android:release:auto`、`android:aab:auto`）在构建前自动执行“备份并注释”，构建结束后自动“还原备份”，便于继续开发。
+- 通用构建命令 `android:build` 也会在构建前执行清理并在构建后自动还原。
+- 如构建失败，脚本会尝试还原；若还原失败，可手动执行：`node scripts/prepare-release-clean-server-url.cjs --mode restore`。
+
+### 脚本位置与行为摘要
+- Wi‑Fi：`scripts/dev-android-wifi.cjs`
+- USB：`scripts/dev-android-usb.cjs`
+- 发布前清理：`scripts/prepare-release-clean-server-url.cjs`
+- 行为要点：
+  - 自动检测/复用开发服务器，必要时启动。
+  - 更新 `capacitor.config.ts` 并输出诊断信息与修复指引。
+  - `native-run` 失败时提供修复建议；设备离线时提示检查 `adb devices`。
+  - 发布清理脚本支持“备份与注释/还原”：
+    - 备份文件位置：`scripts/.backup/capacitor.config.ts.bak`
+    - 手动备份并注释：`npm run android:release:prepare` 或 `node scripts/prepare-release-clean-server-url.cjs --mode backup`
+    - 手动还原：`node scripts/prepare-release-clean-server-url.cjs --mode restore`
+
+### 常见问题（自动化命令）
+- 未检测到设备：授权 USB 调试并确保 `adb devices` 显示 `device` 状态。
+- Wi‑Fi 无法访问开发服务器：检查电脑防火墙允许 5173 端口，确认同网段连接。
+- 端口占用：关闭占用 5173 的进程或修改本地开发端口后重新运行命令。
+- 首次运行没有刷新：尝试结束 App 后重新打开，或重新执行上述命令。
+
+### 可配置项（端口与 IP 探测）
+- 默认端口：`5173`。
+  - 覆盖方式：
+    - 命令行参数：`--port <number>`（示例见下文）。
+    - 环境变量：`DEV_PORT`、`PORT`、`npm_config_port`（优先级依次降低）。
+- 局域网 IP 探测（Wi‑Fi 模式）：
+  - 探测顺序：优先选择 `192.168.*`，其后 `10.*`，其后 `172.16–31.*`，最后回退到首个非内网回环的 IPv4。
+  - 覆盖方式：
+    - 命令行参数：`--ip <LAN_IP>` 显式指定 IP。
+    - 环境变量：`DEV_IP` 或 `DEV_HOST`。
+    - 网卡优先：`--preferAdapter "<regex>"` 或环境变量 `DEV_ADAPTER`（按网卡名称正则优先匹配，如 `"WLAN|Wi-Fi|Ethernet"`）。
+- npm 传参用法（示例）：
+  ```bash
+  # Wi‑Fi：自定义端口与 IP（并优先匹配 WLAN）
+  npm run android:dev:wifi:auto -- --port 5180 --ip 192.168.1.8 --preferAdapter "WLAN|Wi-Fi"
+
+  # USB：自定义端口（自动 localhost + adb reverse）
+  npm run android:dev:usb:auto -- --port 5180
+  ```
+  - 两种模式都会以 `--host` 启动或复用 Vite 开发服务器，确保手机端可访问。
+
 ## 📦 产物与路径
 
 - Debug APK：`android/app/build/outputs/apk/debug/app-debug.apk`

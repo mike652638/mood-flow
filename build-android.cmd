@@ -303,6 +303,14 @@ try {
   # 0) 配置一致性校验（applicationId 与 Capacitor appId）
   Validate-Config
 
+  # 0.5) 发布模式预清理：备份并注释 server.url，以确保使用 dist 静态资源
+  if ($Mode.ToLower() -in @('release','aab')) {
+    Write-Info '发布前清理 server.url（备份并注释）'
+    & node.exe scripts/prepare-release-clean-server-url.cjs --mode backup
+    if ($LASTEXITCODE -ne 0) { throw '清理 server.url 失败' }
+    Write-Success '已注释 server.url，保留 webDir="dist"（已创建备份）'
+  }
+
   if ($Mode.ToLower() -in @('release','aab')) {
     $ksFile = 'android/keystore.properties'
     if (-not (Test-Path $ksFile)) { Write-Warn '未找到 android/keystore.properties，可能生成未签名产物或构建失败' }
@@ -394,6 +402,10 @@ try {
         Write-Warn '跳过安装（NoInstall）'
       }
       Write-Success '全部完成 (Release)'
+      # 构建结束后自动恢复开发配置
+      Write-Info '恢复开发配置（server.url）'
+      & node.exe scripts/prepare-release-clean-server-url.cjs --mode restore
+      if ($LASTEXITCODE -ne 0) { Write-Warn '恢复失败，请手动检查备份：scripts/.backup/capacitor.config.ts.bak' } else { Write-Success '已恢复 server.url 至构建前状态' }
     }
     'aab' {
       Write-Info '=== 步骤 4/4：Gradle bundleRelease 并导出 AAB ==='
@@ -412,6 +424,10 @@ try {
       Write-Info '你可以将该 AAB 上传到应用商店或使用 bundletool 进行本地生成与安装'
       Write-Info 'bundletool 参考：java -jar bundletool.jar build-apks --bundle app-release.aab --output app.apks --connected-device --mode default'
       Write-Success '全部完成 (AAB)'
+      # 导出结束后自动恢复开发配置
+      Write-Info '恢复开发配置（server.url）'
+      & node.exe scripts/prepare-release-clean-server-url.cjs --mode restore
+      if ($LASTEXITCODE -ne 0) { Write-Warn '恢复失败，请手动检查备份：scripts/.backup/capacitor.config.ts.bak' } else { Write-Success '已恢复 server.url 至构建前状态' }
     }
     default {
       throw "未知模式: $Mode"
@@ -420,5 +436,10 @@ try {
 }
 catch {
   Write-Err $_.Exception.Message
+  # 发生错误也尝试恢复
+  if ($Mode.ToLower() -in @('release','aab')) {
+    Write-Warn '构建失败，尝试恢复 server.url（备份）'
+    & node.exe scripts/prepare-release-clean-server-url.cjs --mode restore
+  }
   exit 1
 }

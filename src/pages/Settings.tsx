@@ -1068,6 +1068,23 @@ const Settings = ({ immersiveMode = false, onImmersiveModeChange, onThemeChange 
                           </div>
                           <span className='text-gray-400 group-hover:text-purple-500'>›</span>
                         </Link>
+
+                        <Link
+                          to='/download'
+                          className='group flex items-center justify-between px-4 py-3 sm:px-5 sm:py-4 bg-gray-100 dark:bg-theme-gray-700 hover:bg-purple-50 dark:hover:bg-purple-900/30 rounded-lg transition-all shadow-sm hover:shadow-md'>
+                          <div className='flex items-center space-x-3 sm:space-x-4'>
+                            <Download className='w-5 h-5 sm:w-6 sm:h-6 text-purple-600 dark:text-purple-400' />
+                            <div>
+                              <span className='block font-medium text-gray-800 dark:text-gray-200 text-sm sm:text-base'>
+                                分享应用
+                              </span>
+                              <span className='block text-xs sm:text-sm text-gray-600 dark:text-gray-400'>
+                                前往心流日记下载页面
+                              </span>
+                            </div>
+                          </div>
+                          <span className='text-gray-400 group-hover:text-purple-500'>›</span>
+                        </Link>
                       </div>
                     </div>
                   </div>

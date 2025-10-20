@@ -145,7 +145,8 @@ const DownloadPage = () => {
     <>
       <OpenInBrowserOverlay currentUrl={window.location.href} />
       <Header title='下载心流日记' immersiveMode={false} />
-      <Container className='pb-10 sm:pb-12 lg:pb-14'>
+      {/* 为固定头部+状态栏预留顶部空间，避免主内容被遮挡 */}
+      <Container className='pt-20 pb-6'>
         <div className='page-sections space-y-4 sm:space-y-6'>
           <Card variant='default' padding='md' className='p-4 sm:p-6'>
             <div className='flex items-center gap-3 mb-3'>
@@ -199,13 +200,6 @@ const DownloadPage = () => {
                 <Button onClick={handleDownload} className='w-full'>
                   立即下载 APK
                 </Button>
-                <a
-                  href={apkUrl}
-                  target='_blank'
-                  rel='noreferrer'
-                  className='block text-center text-sm text-gray-600 dark:text-gray-400 underline'>
-                  如果按钮无效，点此备用链接
-                </a>
                 {apkMeta && (apkMeta.sizeText || apkMeta.checksum) && (
                   <div className='mt-2 text-xs sm:text-sm text-gray-700 dark:text-gray-300 space-y-1'>
                     {apkMeta.sizeText && <p>文件大小：{apkMeta.sizeText}</p>}

@@ -164,10 +164,16 @@ const ImmersiveStatusBar: React.FC<ImmersiveStatusBarProps> = ({
             }
           }
         } else {
+          // 修复：更好地检测当前主题
           const isDark =
-            theme === 'dark' || (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            theme === 'dark' ||
+            (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches) ||
+            document.documentElement.classList.contains('dark');
+
           const root = document.documentElement;
           const headerStart = getComputedStyle(root).getPropertyValue('--header-start-color')?.trim();
+
+          // 修复：根据当前主题选择正确的背景色
           const fallbackBg = isDark ? '#1f2937' : '#ffffff';
           const nonImmersiveBg = headerStart && headerStart.length > 0 ? headerStart : fallbackBg;
 

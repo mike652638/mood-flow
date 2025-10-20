@@ -438,7 +438,15 @@ const Analytics = () => {
 
     return (
       <g>
-        <line x1={sx} y1={sy} x2={ex} y2={ey} stroke={pieConfig.lineColor} strokeWidth={pieConfig.lineWidth} strokeDasharray={pieConfig.lineDash} />
+        <line
+          x1={sx}
+          y1={sy}
+          x2={ex}
+          y2={ey}
+          stroke={pieConfig.lineColor}
+          strokeWidth={pieConfig.lineWidth}
+          strokeDasharray={pieConfig.lineDash}
+        />
         <text
           x={x}
           y={y}
@@ -446,8 +454,7 @@ const Analytics = () => {
           textAnchor={textAnchor}
           dominantBaseline='central'
           fontSize={pieConfig.labelFontSize}
-          fontWeight={600}
-        >
+          fontWeight={600}>
           {text}
         </text>
       </g>
