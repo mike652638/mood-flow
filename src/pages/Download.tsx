@@ -91,6 +91,9 @@ const DownloadPage = () => {
     params.get('from') === 'settings' ||
     params.get('source') === 'settings';
   const shareTarget = apkUrl || window.location.href;
+  // WeChat/QQ UA 检测，用于优化提示文案
+  const isWeChatOrQQ =
+    /MicroMessenger|QQ\//i.test(navigator.userAgent) || /QQBrowser|MQQBrowser/i.test(navigator.userAgent);
 
   // 轻量校验：HEAD/Range 请求获取 APK 大小与摘要
   useEffect(() => {
@@ -235,19 +238,19 @@ const DownloadPage = () => {
             </div>
             <div className='grid md:grid-cols-3 gap-3 sm:gap-4'>
               <div className='bg-gray-50 dark:bg-theme-gray-800 rounded-lg p-3 sm:p-4'>
-                <p className='text-sm sm:text-base text-gray-800 dark:text-gray-200'>- 快速记录情绪与触发事件</p>
-                <p className='text-sm sm:text-base text-gray-800 dark:text-gray-200'>- AI 伙伴给出安慰与建议</p>
-                <p className='text-sm sm:text-base text-gray-800 dark:text-gray-200'>- 趋势图与分析报告帮助成长</p>
+                <p className='text-sm sm:text-base leading-relaxed text-gray-800 dark:text-gray-200'>- 快速记录情绪与触发事件</p>
+                <p className='text-sm sm:text-base leading-relaxed text-gray-800 dark:text-gray-200'>- AI 伙伴给出安慰与建议</p>
+                <p className='text-sm sm:text-base leading-relaxed text-gray-800 dark:text-gray-200'>- 趋势图与分析报告帮助成长</p>
               </div>
               <div className='bg-gray-50 dark:bg-theme-gray-800 rounded-lg p-3 sm:p-4'>
-                <p className='text-sm sm:text-base text-gray-800 dark:text-gray-200'>- 保护隐私的本地存储与加密</p>
-                <p className='text-sm sm:text-base text-gray-800 dark:text-gray-200'>- 可选提醒，建立记录习惯</p>
-                <p className='text-sm sm:text-base text-gray-800 dark:text-gray-200'>- 沉浸式与主题模式自由切换</p>
+                <p className='text-sm sm:text-base leading-relaxed text-gray-800 dark:text-gray-200'>- 保护隐私的本地存储与加密</p>
+                <p className='text-sm sm:text-base leading-relaxed text-gray-800 dark:text-gray-200'>- 可选提醒，建立记录习惯</p>
+                <p className='text-sm sm:text-base leading-relaxed text-gray-800 dark:text-gray-200'>- 沉浸式与主题模式自由切换</p>
               </div>
               <div className='bg-gray-50 dark:bg-theme-gray-800 rounded-lg p-3 sm:p-4'>
-                <p className='text-sm sm:text-base text-gray-800 dark:text-gray-200'>- 纯净无广告，轻量高效</p>
-                <p className='text-sm sm:text-base text-gray-800 dark:text-gray-200'>- 适配常见 Android 机型</p>
-                <p className='text-sm sm:text-base text-gray-800 dark:text-gray-200'>- 持续迭代与版本更新</p>
+                <p className='text-sm sm:text-base leading-relaxed text-gray-800 dark:text-gray-200'>- 纯净无广告，轻量高效</p>
+                <p className='text-sm sm:text-base leading-relaxed text-gray-800 dark:text-gray-200'>- 适配常见 Android 机型</p>
+                <p className='text-sm sm:text-base leading-relaxed text-gray-800 dark:text-gray-200'>- 持续迭代与版本更新</p>
               </div>
             </div>
           </Card>
@@ -261,7 +264,7 @@ const DownloadPage = () => {
                   <p className='text-sm text-gray-600 dark:text-gray-400'>最新版本：V{info.latestVersion}</p>
                 )}
                 {info?.publishedAt && (
-                  <p className='text-xs text-gray-500 dark:text-gray-500'>发布时间：{info.publishedAt}</p>
+                  <p className='text-sm sm:text-base text-gray-500 dark:text-gray-500 leading-relaxed'>发布时间：{info.publishedAt}</p>
                 )}
               </div>
             </div>
@@ -303,7 +306,7 @@ const DownloadPage = () => {
                 {info?.releaseNotes && (
                   <details className='mt-2'>
                     <summary className='text-sm sm:text-base text-gray-700 dark:text-gray-300 cursor-pointer'>版本更新说明</summary>
-                    <pre className='whitespace-pre-wrap text-sm sm:text-base text-gray-700 dark:text-gray-300 mt-2'>
+                    <pre className='whitespace-pre-wrap text-sm sm:text-base leading-relaxed text-gray-700 dark:text-gray-300 mt-2'>
                       {info.releaseNotes.length > 160 ? info.releaseNotes.slice(0, 800) : info.releaseNotes}
                     </pre>
                   </details>
@@ -333,7 +336,7 @@ const DownloadPage = () => {
                   loading='lazy'
                 />
               </div>
-              <p className='mt-3 text-sm sm:text-base text-gray-700 dark:text-gray-300 text-center'>
+              <p className='mt-3 text-sm sm:text-base leading-relaxed text-gray-700 dark:text-gray-300 text-center'>
                 使用手机扫码即可下载，移动端也可将二维码展示给他人扫码。
               </p>
             </div>
@@ -344,7 +347,7 @@ const DownloadPage = () => {
               <Shield className='w-6 h-6 text-purple-600 dark:text-purple-400' />
               <h3 className='text-lg sm:text-xl font-semibold text-gray-900 dark:text-white'>安装指引（Android）</h3>
             </div>
-            <ol className='space-y-2 list-decimal list-inside text-sm sm:text-base text-gray-800 dark:text-gray-200'>
+            <ol className='space-y-2 list-decimal list-inside text-sm sm:text-base leading-relaxed text-gray-800 dark:text-gray-200'>
               <li>点击上方“立即下载 APK”，等待下载完成。</li>
               <li>下载完成后，打开“文件管理”，在“下载”目录找到 APK 文件。</li>
               <li>
@@ -354,7 +357,7 @@ const DownloadPage = () => {
               <li>返回 APK 文件，点击打开并按提示完成安装。</li>
               <li>安装后从桌面打开“心流日记”，首次进入可在“设置”中开启提醒与沉浸式状态栏。</li>
             </ol>
-            <div className='mt-3 flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400'>
+            <div className='mt-3 flex items-center gap-2 text-sm sm:text-base leading-relaxed text-gray-600 dark:text-gray-400'>
               <Info className='w-4 h-4 flex-shrink-0' />
               <span>若浏览器拦截下载或提示风险，请选择“仍然下载/保留”，本应用不含广告与恶意代码。</span>
             </div>
@@ -365,7 +368,7 @@ const DownloadPage = () => {
               <CheckCircle className='w-6 h-6 text-green-600 dark:text-green-400' />
               <h3 className='text-lg sm:text-xl font-semibold text-gray-900 dark:text-white'>常见问题</h3>
             </div>
-            <div className='space-y-2 text-sm sm:text-base text-gray-800 dark:text-gray-200'>
+            <div className='space-y-2 text-sm sm:text-base leading-relaxed text-gray-800 dark:text-gray-200'>
               <p>• 无法打开 APK：请使用系统“文件管理”或 Chrome/系统浏览器下载并打开。</p>
               <p>• 提示无法安装：请确认已允许“安装未知应用”的权限，并确保 APK 完整下载。</p>
               <p>• 下载很慢或中断：可切换网络或使用上方备用链接。</p>
@@ -403,8 +406,10 @@ const DownloadPage = () => {
                   loading='lazy'
                 />
               </div>
-              <p className='mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400 text-center'>
-                在微信/QQ中可直接粘贴链接或让对方扫码下载；若无法直接打开，请复制链接到浏览器中打开。
+              <p className='mt-2 text-sm sm:text-base leading-relaxed text-gray-600 dark:text-gray-400 text-center'>
+                {isWeChatOrQQ
+                  ? '当前为微信/QQ内置浏览器环境，下载可能受限。建议复制链接到外部浏览器打开，或让对方扫码下载。'
+                  : '可复制链接或扫码下载；如无法直接打开，请复制到浏览器中。'}
               </p>
             </div>
           </div>
