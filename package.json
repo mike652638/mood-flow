@@ -27,7 +27,8 @@
     "android:dev:usb:auto": "node scripts/dev-android-usb.cjs",
     "android:release:prepare": "node scripts/prepare-release-clean-server-url.cjs",
     "ci:push": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/ci-push-and-monitor.ps1",
-    "ci:push:wait300": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/ci-push-and-monitor.ps1 -WaitSeconds 300"
+    "ci:push:wait300": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/ci-push-and-monitor.ps1 -WaitSeconds 300",
+    "web:deploy": "npm run build && npx vercel --prod"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.1",

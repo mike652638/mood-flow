@@ -4,8 +4,11 @@ import Container from '../components/Container';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import { checkForUpdate, openUpdateLink, UpdateInfo } from '../utils/update';
-import { Smartphone, Download, CheckCircle, Info, Shield, QrCode } from 'lucide-react';
+import { Smartphone, Download, CheckCircle, Info, Shield, QrCode, Share2, Copy } from 'lucide-react';
 import OpenInBrowserOverlay from '../components/OpenInBrowserOverlay';
+import { useLocation, useNavigate } from 'react-router-dom';
+import Modal from '../components/Modal';
+import { toast } from 'sonner';
 
 const DownloadPage = () => {
   const [loading, setLoading] = useState(true);
@@ -18,6 +21,12 @@ const DownloadPage = () => {
     checksumType?: string;
     checksum?: string;
   } | null>(null);
+
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [openingDownload, setOpeningDownload] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,24 +69,42 @@ const DownloadPage = () => {
   const handleDownload = async () => {
     const url = info?.androidApkUrl;
     if (url) {
-      await openUpdateLink(url);
+      try {
+        setOpeningDownload(true);
+        await toast.promise(openUpdateLink(url), {
+          loading: '正在打开下载…',
+          success: '已打开下载链接',
+          error: '打开失败，请稍后重试'
+        });
+      } finally {
+        setOpeningDownload(false);
+      }
     }
   };
 
   const apkUrl = info?.androidApkUrl || '';
 
+  const params = new URLSearchParams(location.search);
+  const routeState = location.state as { from?: string } | null;
+  const isFromSettings =
+    routeState?.from === 'settings' ||
+    params.get('from') === 'settings' ||
+    params.get('source') === 'settings';
+  const shareTarget = apkUrl || window.location.href;
+
   // 轻量校验：HEAD/Range 请求获取 APK 大小与摘要
   useEffect(() => {
     let cancelled = false;
+    const ac = new AbortController();
     const fetchMeta = async (url: string) => {
       try {
         const tryHead = async () => {
-          const res = await fetch(url, { method: 'HEAD' });
+          const res = await fetch(url, { method: 'HEAD', signal: ac.signal });
           if (!res.ok) throw new Error(`HEAD ${res.status}`);
           return res;
         };
         const tryRange = async () => {
-          const res = await fetch(url, { method: 'GET', headers: { Range: 'bytes=0-0' } });
+          const res = await fetch(url, { method: 'GET', headers: { Range: 'bytes=0-0' }, signal: ac.signal });
           if (!res.ok) throw new Error(`RANGE ${res.status}`);
           return res;
         };
@@ -127,6 +154,7 @@ const DownloadPage = () => {
     if (apkUrl) fetchMeta(apkUrl);
     return () => {
       cancelled = true;
+      ac.abort();
     };
   }, [apkUrl]);
 
@@ -141,12 +169,61 @@ const DownloadPage = () => {
     return `${n.toFixed(n < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
   }
 
+  const handleShare = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: '心流日记下载', text: '下载心流日记 APP', url: shareTarget });
+        return;
+      }
+    } catch (error) {
+      console.warn('Web Share 调用失败，回退到自定义弹窗:', error);
+    }
+    setShowShareModal(true);
+  };
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareTarget);
+      setCopied(true);
+      toast.success('链接已复制');
+    } catch (error) {
+      console.warn('复制链接失败，尝试使用回退方案:', error);
+      try {
+        const input = document.createElement('input');
+        input.value = shareTarget;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+        setCopied(true);
+        toast.success('链接已复制');
+      } catch (fallbackError) {
+        console.warn('复制链接失败（剪贴板与回退均失败）:', fallbackError);
+        setCopied(false);
+      }
+    }
+    setTimeout(() => setCopied(false), 1500);
+  };
+
   return (
     <>
       <OpenInBrowserOverlay currentUrl={window.location.href} />
-      <Header title='下载心流日记' immersiveMode={false} />
+      <Header
+        title='下载心流日记'
+        immersiveMode={false}
+        showBackButton={isFromSettings}
+        onBack={() => navigate('/settings')}
+        rightIcon={
+          <button
+            onClick={handleShare}
+            className='p-2 rounded-xl bg-white/80 dark:bg-theme-gray-700/80 hover:bg-white dark:hover:bg-theme-gray-600 text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-all duration-200 hover:scale-110 active:scale-95 shadow-sm hover:shadow-md'
+            aria-label='分享'>
+            <Share2 size={20} />
+          </button>
+        }
+      />
       {/* 为固定头部+状态栏预留顶部空间，避免主内容被遮挡 */}
-      <Container className='pt-20 pb-6'>
+      <Container style={{ paddingTop: 'calc(var(--header-height, 64px) + 8px)' }} className='pb-6'>
         <div className='page-sections space-y-4 sm:space-y-6'>
           <Card variant='default' padding='md' className='p-4 sm:p-6'>
             <div className='flex items-center gap-3 mb-3'>
@@ -197,24 +274,36 @@ const DownloadPage = () => {
               <p className='text-sm text-red-600'>获取版本信息失败，请稍后重试</p>
             ) : apkUrl ? (
               <div className='space-y-3'>
-                <Button onClick={handleDownload} className='w-full'>
-                  立即下载 APK
+                <Button
+                  onClick={handleDownload}
+                  disabled={openingDownload}
+                  className='w-full disabled:opacity-60 disabled:cursor-not-allowed'>
+                  {openingDownload ? (
+                    <span className='inline-flex items-center gap-2'>
+                      <span className='animate-spin rounded-full h-4 w-4 border-2 border-white/70 border-t-transparent'></span>
+                      正在打开下载…
+                    </span>
+                  ) : (
+                    '立即下载 APK'
+                  )}
                 </Button>
                 {apkMeta && (apkMeta.sizeText || apkMeta.checksum) && (
-                  <div className='mt-2 text-xs sm:text-sm text-gray-700 dark:text-gray-300 space-y-1'>
+                  <div className='mt-2 text-sm sm:text-base text-gray-700 dark:text-gray-300 space-y-1'>
                     {apkMeta.sizeText && <p>文件大小：{apkMeta.sizeText}</p>}
                     {apkMeta.checksum && (
-                      <p>
-                        校验摘要（{apkMeta.checksumType}）：
-                        <span className='break-all'>{apkMeta.checksum}</span>
-                      </p>
+                      <>
+                        <p>校验方式：{apkMeta.checksumType || '未知'}</p>
+                        <p>
+                          校验值：<span className='break-all'>{apkMeta.checksum}</span>
+                        </p>
+                      </>
                     )}
                   </div>
                 )}
                 {info?.releaseNotes && (
                   <details className='mt-2'>
-                    <summary className='text-sm text-gray-700 dark:text-gray-300 cursor-pointer'>版本更新说明</summary>
-                    <pre className='whitespace-pre-wrap text-xs sm:text-sm text-gray-700 dark:text-gray-300 mt-2'>
+                    <summary className='text-sm sm:text-base text-gray-700 dark:text-gray-300 cursor-pointer'>版本更新说明</summary>
+                    <pre className='whitespace-pre-wrap text-sm sm:text-base text-gray-700 dark:text-gray-300 mt-2'>
                       {info.releaseNotes.length > 160 ? info.releaseNotes.slice(0, 800) : info.releaseNotes}
                     </pre>
                   </details>
@@ -222,7 +311,7 @@ const DownloadPage = () => {
               </div>
             ) : (
               <div className='space-y-2'>
-                <p className='text-sm text-gray-800 dark:text-gray-200'>暂无可用下载链接，请稍后重试或联系维护者。</p>
+                <p className='text-sm sm:text-base text-gray-800 dark:text-gray-200'>暂无可用下载链接，请稍后重试或联系维护者。</p>
               </div>
             )}
           </Card>
@@ -284,6 +373,44 @@ const DownloadPage = () => {
           </Card>
         </div>
       </Container>
+
+      {showShareModal && (
+        <Modal title='分享下载链接' onClose={() => setShowShareModal(false)}>
+          <div className='space-y-2 sm:space-y-3'>
+            <div className='flex items-center gap-2'>
+              <input
+                readOnly
+                type='text'
+                aria-label='下载链接'
+                onClick={(e) => (e.currentTarget as HTMLInputElement).select()}
+                value={shareTarget}
+                className='input w-full bg-white dark:bg-theme-gray-700 text-gray-800 dark:text-gray-100 text-sm sm:text-base'
+              />
+              <button
+                onClick={copyLink}
+                aria-label='复制链接'
+                className='px-3 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm sm:text-base flex items-center gap-1'>
+                <Copy className='w-4 h-4' />
+                {copied ? '已复制' : '复制'}
+              </button>
+            </div>
+            <div className='flex flex-col items-center'>
+              <div className='rounded-xl overflow-hidden border border-gray-200 dark:border-theme-gray-700 bg-white dark:bg-theme-gray-800 p-2 shadow-sm'>
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(shareTarget)}`}
+                  alt='分享二维码'
+                  className='w-[180px] sm:w-[200px] md:w-[240px] h-auto'
+                  loading='lazy'
+                />
+              </div>
+              <p className='mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400 text-center'>
+                在微信/QQ中可直接粘贴链接或让对方扫码下载；若无法直接打开，请复制链接到浏览器中打开。
+              </p>
+            </div>
+          </div>
+        </Modal>
+      )}
+
     </>
   );
 };

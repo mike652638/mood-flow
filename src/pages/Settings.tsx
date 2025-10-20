@@ -1070,7 +1070,8 @@ const Settings = ({ immersiveMode = false, onImmersiveModeChange, onThemeChange 
                         </Link>
 
                         <Link
-                          to='/download'
+                          to={{ pathname: '/download', search: '?from=settings' }}
+                          state={{ from: 'settings' }}
                           className='group flex items-center justify-between px-4 py-3 sm:px-5 sm:py-4 bg-gray-100 dark:bg-theme-gray-700 hover:bg-purple-50 dark:hover:bg-purple-900/30 rounded-lg transition-all shadow-sm hover:shadow-md'>
                           <div className='flex items-center space-x-3 sm:space-x-4'>
                             <Download className='w-5 h-5 sm:w-6 sm:h-6 text-purple-600 dark:text-purple-400' />
