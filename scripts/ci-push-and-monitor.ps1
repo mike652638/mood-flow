@@ -358,6 +358,21 @@ try {
   $br = Get-Branch
   Write-Info ("Target branch: " + $br)
   if (-not $SkipPush) {
+    # Pre-commit: ensure release uses bundled dist by cleaning server.url
+    try {
+      $confPath = 'capacitor.config.ts'
+      if (Test-Path $confPath) {
+        $src = Get-Content $confPath -Raw
+        $hasServer = [regex]::IsMatch($src, 'server:\s*{[\s\S]*?}', 'IgnoreCase')
+        $hasUrl = [regex]::IsMatch($src, "\n\s*url:\s*'[^']*'", 'IgnoreCase')
+        if ($hasServer -and $hasUrl) {
+          Write-Info 'Preparing release: cleaning server.url before push'
+          & node scripts/prepare-release-clean-server-url.cjs --mode backup
+          Write-Ok 'server.url commented for release build'
+        }
+      }
+    } catch { Write-Warn ('Failed to clean server.url pre-commit: ' + $_.Exception.Message) }
+
     if (Test-Changes) {
       Write-Info 'Uncommitted changes detected, preparing commit'
       & git add -A
@@ -391,6 +406,12 @@ try {
     Write-Info 'Pushing tag to origin'
     & git push origin $tagName --force
     Write-Ok 'Tag push done (CI should be triggered)'
+
+    # Post-push: restore local server.url from backup for continued development
+    try {
+      & node scripts/prepare-release-clean-server-url.cjs --mode restore
+      Write-Info 'Local server.url restored from backup (dev convenience)'
+    } catch { Write-Warn ('Restore skipped or failed: ' + $_.Exception.Message) }
   }
 
   $sha = (& git rev-parse "$tagName^{commit}").Trim()
