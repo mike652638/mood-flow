@@ -1,13 +1,13 @@
 ﻿{
     "ok":  true,
-    "tag":  "v1.3.10",
+    "tag":  "v1.3.11",
     "branch":  "main",
-    "head_sha":  "82f6d3ef21ef375872f6d0a690c06ea8871e136b",
-    "run_id":  18658352455,
-    "run_number":  111,
+    "head_sha":  "fd51d72edaaf1a89a16bc69d78140032c6d48603",
+    "run_id":  18670188680,
+    "run_number":  112,
     "status":  "completed",
     "conclusion":  "success",
-    "html_url":  "https://github.com/mike652638/mood-flow/actions/runs/18658352455",
+    "html_url":  "https://github.com/mike652638/mood-flow/actions/runs/18670188680",
     "workflow_name":  "Build Android APK",
     "workflow_path":  ".github/workflows/build-android.yml",
     "jobs":  [
@@ -22,8 +22,8 @@
                      "conclusion":  "success"
                  }
              ],
-    "release_url":  "https://github.com/mike652638/mood-flow/releases/tag/v1.3.10",
-    "r2_apk_url":  "https://pub-0bd3064e8b4743b19a2219ed6f880902.r2.dev/releases/mood-flow-1.3.10-store-202510201628-r111-g82f6d3e.apk",
+    "release_url":  "https://github.com/mike652638/mood-flow/releases/tag/v1.3.11",
+    "r2_apk_url":  "https://pub-0bd3064e8b4743b19a2219ed6f880902.r2.dev/releases/mood-flow-1.3.11-store-202510210151-r112-gfd51d72.apk",
     "apk_release_asset_url":  null,
     "apk_source":  "logs"
 }

@@ -9,8 +9,10 @@ import OpenInBrowserOverlay from '../components/OpenInBrowserOverlay';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 import { toast } from 'sonner';
+import { useImmersiveMode } from '../hooks/useImmersiveMode';
 
 const DownloadPage = () => {
+  const { immersiveMode } = useImmersiveMode();
   const [loading, setLoading] = useState(true);
   const [info, setInfo] = useState<UpdateInfo | null>(null);
   const [_sourceUrl, setSourceUrl] = useState<string>('');
@@ -213,7 +215,7 @@ const DownloadPage = () => {
       <OpenInBrowserOverlay currentUrl={window.location.href} />
       <Header
         title='下载心流日记'
-        immersiveMode={false}
+        immersiveMode={immersiveMode}
         showBackButton={isFromSettings}
         onBack={() => navigate('/settings')}
         rightIcon={
@@ -226,7 +228,7 @@ const DownloadPage = () => {
         }
       />
       {/* 为固定头部+状态栏预留顶部空间，避免主内容被遮挡 */}
-      <Container style={{ paddingTop: 'calc(var(--header-height, 64px) + 8px)' }} className='pb-6'>
+      <Container className='pt-safe-area-and-header pb-6'>
         <div className='page-sections space-y-4 sm:space-y-6'>
           <Card variant='default' padding='md' className='p-4 sm:p-6'>
             <div className='flex items-center gap-3 mb-3'>

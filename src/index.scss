@@ -17,7 +17,7 @@
 :root {
   /* 全局层级变量：模态框 */
   --modal-z-index: 1000;
-  --safe-area-extra-top: 32px;
+  --safe-area-extra-top: 24px;
   --safe-area-extra-bottom: 0px;
   /* Scrollbar styling: Firefox uses scrollbar-width; WebKit fallback provided below */
   scrollbar-width: thin;
@@ -84,13 +84,13 @@
 
   /* 暗色主题复用变量（RGB，不含 alpha），供 Tailwind 映射使用 */
   --theme-indigo-300: 165 180 252; /* Indigo-300 */
-  --theme-gray-700: 55 65 81;     /* Gray-700 */
-  --theme-gray-800: 31 41 55;     /* Gray-800 */
-  --theme-gray-900: 17 24 39;     /* Gray-900 */
+  --theme-gray-700: 55 65 81; /* Gray-700 */
+  --theme-gray-800: 31 41 55; /* Gray-800 */
+  --theme-gray-900: 17 24 39; /* Gray-900 */
 
   /* 阴影透明度变量（可在多个板块复用） */
   --shadow-strong: 0.35; /* 大型投影强度 */
-  --shadow-border: 0.2;  /* 细边框阴影强度 */
+  --shadow-border: 0.2; /* 细边框阴影强度 */
 }
 
 /* WebKit scrollbar fallback */
@@ -171,13 +171,13 @@
 
   /* 暗色主题复用变量（RGB，不含 alpha），供 Tailwind 映射使用 */
   --theme-indigo-300: 165 180 252; /* Indigo-300 */
-  --theme-gray-700: 55 65 81;     /* Gray-700 */
-  --theme-gray-800: 31 41 55;     /* Gray-800 */
-  --theme-gray-900: 17 24 39;     /* Gray-900 */
+  --theme-gray-700: 55 65 81; /* Gray-700 */
+  --theme-gray-800: 31 41 55; /* Gray-800 */
+  --theme-gray-900: 17 24 39; /* Gray-900 */
 
   /* 阴影透明度变量（可在多个板块复用） */
   --shadow-strong: 0.35; /* 大型投影强度 */
-  --shadow-border: 0.2;  /* 细边框阴影强度 */
+  --shadow-border: 0.2; /* 细边框阴影强度 */
 }
 
 /* 基础样式重置 */

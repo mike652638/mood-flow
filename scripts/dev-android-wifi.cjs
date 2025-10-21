@@ -66,6 +66,91 @@ function pickLanIp(adapterRegex) {
   return pick('192.168.') || pick('10.') || (list.find(ip => ip.match(/^172\.(1[6-9]|2\d|3[0-1])\./)) || list[0]);
 }
 
+// --- 依据设备 Wi‑Fi 子网选择本机 IP ---
+function cidrToMask(bits) {
+  const b = parseInt(bits, 10);
+  const mask = (0xffffffff << (32 - b)) >>> 0;
+  return [(mask >>> 24) & 255, (mask >>> 16) & 255, (mask >>> 8) & 255, mask & 255].join('.');
+}
+function ipToInt(ip) {
+  return ip.split('.').reduce((acc, v) => (acc << 8) + parseInt(v, 10), 0) >>> 0;
+}
+function inSameSubnet(ip1, mask1, ip2) {
+  const m = ipToInt(mask1);
+  return (ipToInt(ip1) & m) === (ipToInt(ip2) & m);
+}
+function getDeviceWifiIp() {
+  try {
+    const out1 = spawnSync('adb', ['shell', 'ip', '-o', '-4', 'addr', 'show', 'wlan0'], { cwd: ROOT, encoding: 'utf8', shell: true }).stdout || '';
+    const m1 = out1.match(/inet\s+(\d+\.\d+\.\d+\.\d+)\/(\d+)/);
+    if (m1) return { ip: m1[1], netmask: cidrToMask(m1[2]) };
+    const out2 = spawnSync('adb', ['shell', 'ifconfig', 'wlan0'], { cwd: ROOT, encoding: 'utf8', shell: true }).stdout || '';
+    const m2 = out2.match(/inet\s(?:addr:)?(\d+\.\d+\.\d+\.\d+)/);
+    if (m2) return { ip: m2[1], netmask: '255.255.255.0' };
+    const out3 = spawnSync('adb', ['shell', 'ip', 'route'], { cwd: ROOT, encoding: 'utf8', shell: true }).stdout || '';
+    const m3 = out3.match(/src\s(\d+\.\d+\.\d+\.\d+)/);
+    if (m3) return { ip: m3[1], netmask: '255.255.255.0' };
+  } catch (_) {}
+  return null;
+}
+function pickLanIpSmart(adapterRegex) {
+  const dev = getDeviceWifiIp();
+  const ifaces = os.networkInterfaces();
+  const candidates = [];
+  for (const name of Object.keys(ifaces)) {
+    for (const info of ifaces[name] || []) {
+      if (info.family === 'IPv4' && !info.internal) {
+        candidates.push({ ip: info.address, name, netmask: info.netmask || '255.255.255.0' });
+      }
+    }
+  }
+  let list = candidates;
+  if (adapterRegex) {
+    const preferred = candidates.filter(c => adapterRegex.test(c.name));
+    const set = new Set();
+    list = [...preferred, ...candidates].filter(c => (set.has(c.ip) ? false : (set.add(c.ip), true)));
+  }
+  if (dev) {
+    const match = list.find(c => inSameSubnet(c.ip, c.netmask, dev.ip));
+    if (match) {
+      console.log(`✓ 依据设备 Wi‑Fi 子网选择 IP：${match.ip}（网卡 ${match.name}）`);
+      return match.ip;
+    } else {
+      console.log('⚠ 未与设备 Wi‑Fi 子网匹配，将按优先级选择');
+    }
+  }
+  const simple = pickLanIp(adapterRegex);
+  console.log(`⚠ 退回简单规则选择 IP：${simple}`);
+  return simple;
+}
+
+// --- 新增：ADB 设备检测与友好提示 ---
+function parseAdbDevices() {
+  try { spawnSync('adb', ['start-server'], { cwd: ROOT, encoding: 'utf8', shell: true }); } catch (_) {}
+  const out = (spawnSync('adb', ['devices'], { cwd: ROOT, encoding: 'utf8', shell: true }).stdout || '').trim();
+  const lines = out.split(/\r?\n/).filter(l => l && !l.startsWith('List of devices') && !l.startsWith('*'));
+  return lines.map(l => { const [id, state] = l.split(/\s+/); return { id, state }; });
+}
+function ensureAdbDeviceOnline() {
+  const list = parseAdbDevices();
+  if (!list.length) {
+    console.error('✗ 未检测到 ADB 在线设备。\n请先用 USB 连接手机，开启“USB 调试”，并在手机弹窗点击允许电脑的指纹（建议选择始终允许）。');
+    console.error('可选无线调试步骤：1) adb tcpip 5555  2) adb connect <手机IP>:5555  3) 重试：npm run android:dev:wifi:auto');
+    throw new Error('ADB 无设备');
+  }
+  if (list.some(d => d.state === 'unauthorized')) {
+    console.error('✗ 检测到设备未授权。请在手机弹窗点击“允许此电脑的指纹”，或开发者选项→已调试设备中移除后重插。');
+    throw new Error('ADB 设备未授权');
+  }
+  const online = list.find(d => d.state === 'device') || list[0];
+  if (!online || online.state !== 'device') {
+    console.error('✗ 检测到设备状态非 device（可能为 offline）。请重插 USB，或执行：adb kill-server && adb start-server');
+    throw new Error('ADB 设备非在线');
+  }
+  console.log(`✓ 检测到 ADB 设备：${online.id}`);
+  return online;
+}
+
 function updateCapacitorServerUrl(ip, port) {
   const targetUrl = `http://${ip}:${port}`;
   const src = fs.readFileSync(CONFIG_PATH, 'utf8');
@@ -114,7 +199,7 @@ async function ensureDevServer(port) {
 function run(cmd, args, opts = {}) {
   console.log(`> ${cmd} ${args.join(' ')}`);
   const res = spawnSync(cmd, args, { cwd: ROOT, stdio: 'inherit', shell: true, ...opts });
-  if (res.status !== 0) throw new Error(`${cmd} 执行失败，code=${res.status}`);
+  if (res.status !== 0) throw new Error(`npm 执行失败，code=${res.status}`);
 }
 
 (async function main() {
@@ -131,13 +216,17 @@ function run(cmd, args, opts = {}) {
   --help            显示帮助
 环境变量：
   DEV_PORT, DEV_IP/DEV_HOST, DEV_ADAPTER
+提示：在运行本命令前，建议先通过 USB 完成一次 ADB 授权（手机弹窗点允许电脑的指纹）。
 `);
       process.exit(0);
     }
     const port = Number(args.port || process.env.DEV_PORT || process.env.PORT || process.env.npm_config_port || DEFAULT_PORT);
     await ensureDevServer(port);
+    // 在选择 IP 前，先确保有 ADB 在线设备（避免后续 native-run 失败）
+    ensureAdbDeviceOnline();
+
     const adapterRegex = (args.preferAdapter || process.env.DEV_ADAPTER) ? new RegExp(args.preferAdapter || process.env.DEV_ADAPTER, 'i') : null;
-    const ip = (args.ip || process.env.DEV_IP || process.env.DEV_HOST || pickLanIp(adapterRegex));
+    const ip = (args.ip || process.env.DEV_IP || process.env.DEV_HOST || pickLanIpSmart(adapterRegex));
     if (!ip) throw new Error('未检测到有效局域网 IP，请确认网络已连接');
     if (args.ip || process.env.DEV_IP || process.env.DEV_HOST) {
       console.log(`✓ 使用指定 IP：${ip}`);
@@ -153,7 +242,7 @@ function run(cmd, args, opts = {}) {
     console.log(`提示：如手机无法访问，请在浏览器打开 http://${ip}:${port}/ 并检查防火墙入站规则`);
   } catch (err) {
     console.error('✗ Wi‑Fi 自动化运行失败：', err.message);
-    console.error('修复建议：1) 确认同一 Wi‑Fi；2) 关闭或放行防火墙；3) 端口未被占用；4) 重新运行本命令');
+    console.error('修复建议：1) 先用 USB 完成 ADB 授权；2) 同一 Wi‑Fi；3) 防火墙放行 5173；4) 端口未被占用；5) 重试本命令');
     process.exit(1);
   }
 })();

@@ -10,6 +10,7 @@ import UpdateFlow from './components/UpdateFlow';
 import { useAuthStore } from './store';
 import Layout from './components/Layout';
 import ImmersiveStatusBar from './components/ImmersiveStatusBar';
+import { ImmersiveModeContext } from './contexts/ImmersiveModeContext';
 
 // 使用动态导入进行代码分割
 const Login = lazy(() => import('./pages/Login'));
@@ -216,19 +217,20 @@ function App() {
 
   return (
     <Router>
-      {/* 沉浸式状态栏组件 */}
-      <ImmersiveStatusBar immersive={immersiveMode} theme={currentTheme} showIndicator={true} enableTransition={true} />
+      <ImmersiveModeContext.Provider value={{ immersiveMode, currentTheme }}>
+        {/* 沉浸式状态栏组件 */}
+        <ImmersiveStatusBar immersive={immersiveMode} theme={currentTheme} showIndicator={true} enableTransition={true} />
 
-      <div className={`app-container ${immersiveMode ? 'immersive' : ''}`}>
-        <Suspense
-          fallback={
-            <div className='min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-sky-50 dark:bg-gradient-to-br dark:from-theme-gray-900 dark:to-theme-gray-800'>
-              <div className='text-center'>
-                <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 dark:border-emerald-400 mx-auto mb-4'></div>
-                <p className='text-gray-800 dark:text-gray-200 font-medium'>加载中，请稍候 ...</p>
+        <div className={`app-container ${immersiveMode ? 'immersive' : ''}`}>
+          <Suspense
+            fallback={
+              <div className='min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-sky-50 dark:bg-gradient-to-br dark:from-theme-gray-900 dark:to-theme-gray-800'>
+                <div className='text-center'>
+                  <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 dark:border-emerald-400 mx-auto mb-4'></div>
+                  <p className='text-gray-800 dark:text-gray-200 font-medium'>加载中，请稍候 ...</p>
+                </div>
               </div>
-            </div>
-          }>
+            }>
           {user ? (
             <Routes>
               <Route path='/' element={<Layout immersiveMode={immersiveMode} currentTheme={currentTheme} />}>
@@ -304,7 +306,8 @@ function App() {
           </Modal>
         )}
         <Toaster position='top-center' richColors offset={128} mobileOffset={{ top: 128 }} duration={2500} />
-      </div>
+        </div>
+      </ImmersiveModeContext.Provider>
     </Router>
   );
 }
