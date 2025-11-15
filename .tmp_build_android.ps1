@@ -199,6 +199,19 @@ function Get-ApplicationId {
   return $null
 }
 
+function Get-AndroidVersionInfo {
+  try {
+    $gradle = Get-Content 'android/app/build.gradle' -Raw
+    $vn = [regex]::Match($gradle, 'versionName\s+"([^"]+)"')
+    $vc = [regex]::Match($gradle, 'versionCode\s+(\d+)')
+    $name = if ($vn.Success) { $vn.Groups[1].Value } else { '' }
+    $code = if ($vc.Success) { $vc.Groups[1].Value } else { '' }
+    return @{ versionName = $name; versionCode = $code }
+  } catch {
+    return @{ versionName = ''; versionCode = '' }
+  }
+}
+
 function Install-APK {
   param([string]$ApkPath, [string]$DeviceId, [bool]$AllowTestInstall = $true)
   if (-not (Test-Path $ApkPath)) { throw "APK 不存在: $ApkPath" }
@@ -262,6 +275,14 @@ try {
   # 0) 配置一致性校验（applicationId 与 Capacitor appId）
   Validate-Config
 
+  # 0.5) 发布模式预清理：备份并注释 server.url，以确保使用 dist 静态资源
+  if ($Mode.ToLower() -in @('release','aab')) {
+    Write-Info '发布前清理 server.url（备份并注释）'
+    & node.exe scripts/prepare-release-clean-server-url.cjs --mode backup
+    if ($LASTEXITCODE -ne 0) { throw '清理 server.url 失败' }
+    Write-Success '已注释 server.url，保留 webDir="dist"（已创建备份）'
+  }
+
   if ($Mode.ToLower() -in @('release','aab')) {
     $ksFile = 'android/keystore.properties'
     if (-not (Test-Path $ksFile)) { Write-Warn '未找到 android/keystore.properties，可能生成未签名产物或构建失败' }
@@ -273,6 +294,11 @@ try {
   # 2) 构建 Web 资源
   Write-Info 'npm run build'
   Write-Info '=== 步骤 2/4：构建 Web 资源 ==='
+  $ver = Get-AndroidVersionInfo
+  if ($ver['versionName']) {
+    Write-Info "注入环境变量 VITE_APP_VERSION=$($ver['versionName'])"
+    $env:VITE_APP_VERSION = $ver['versionName']
+  }
   & npm.cmd run build
   if ($LASTEXITCODE -ne 0) { throw 'Web 构建失败' }
   Write-Success 'Web 构建完成'
@@ -296,12 +322,21 @@ try {
   Write-Success 'Android 项目同步完成'
 
   # 4) 根据模式执行构建/安装
+  #   在进入 Gradle 构建前，显式设置代理到 127.0.0.1:20001，避免默认 10808 被引用
+  $proxyHost = '127.0.0.1'
+  $proxyPort = 20001
+  $env:HTTP_PROXY = "http://${proxyHost}:${proxyPort}"
+  $env:HTTPS_PROXY = "http://${proxyHost}:${proxyPort}"
+  $env:ALL_PROXY = "socks5://${proxyHost}:${proxyPort}"
+  $env:GRADLE_OPTS = "-Dhttp.proxyHost=$proxyHost -Dhttp.proxyPort=$proxyPort -Dhttps.proxyHost=$proxyHost -Dhttps.proxyPort=$proxyPort -DsocksProxyHost=$proxyHost -DsocksProxyPort=$proxyPort"
+  $env:JAVA_TOOL_OPTIONS = "-Dhttp.proxyHost=$proxyHost -Dhttp.proxyPort=$proxyPort -Dhttps.proxyHost=$proxyHost -Dhttps.proxyPort=$proxyPort -DsocksProxyHost=$proxyHost -DsocksProxyPort=$proxyPort"
   switch ($Mode.ToLower()) {
     'debug' {
       Write-Info '=== 步骤 4/4：Gradle assembleDebug 并安装 ==='
       Write-Info 'Gradle assembleDebug'
       Push-Location 'android'
-      & .\gradlew.bat assembleDebug
+      & .\gradlew.bat --stop
+      & .\gradlew.bat assembleDebug --no-daemon --init-script ..\android\proxy.init.gradle
       $gradleExit = $LASTEXITCODE
       Pop-Location
       if ($gradleExit -ne 0) { throw 'Gradle 构建失败 (Debug)' }
@@ -321,7 +356,8 @@ try {
       Write-Info '=== 步骤 4/4：Gradle assembleRelease 并安装 ==='
       Write-Info 'Gradle assembleRelease'
       Push-Location 'android'
-      & .\gradlew.bat assembleRelease
+      & .\gradlew.bat --stop
+      & .\gradlew.bat assembleRelease --no-daemon --init-script ..\android\proxy.init.gradle
       $gradleExit = $LASTEXITCODE
       Pop-Location
       if ($gradleExit -ne 0) { throw 'Gradle 构建失败 (Release)' }
@@ -348,12 +384,17 @@ try {
         Write-Warn '跳过安装（NoInstall）'
       }
       Write-Success '全部完成 (Release)'
+      # 构建结束后自动恢复开发配置
+      Write-Info '恢复开发配置（server.url）'
+      & node.exe scripts/prepare-release-clean-server-url.cjs --mode restore
+      if ($LASTEXITCODE -ne 0) { Write-Warn '恢复失败，请手动检查备份：scripts/.backup/capacitor.config.ts.bak' } else { Write-Success '已恢复 server.url 至构建前状态' }
     }
     'aab' {
       Write-Info '=== 步骤 4/4：Gradle bundleRelease 并导出 AAB ==='
       Write-Info 'Gradle bundleRelease'
       Push-Location 'android'
-      & .\gradlew.bat bundleRelease
+      & .\gradlew.bat --stop
+      & .\gradlew.bat bundleRelease --no-daemon --init-script ..\android\proxy.init.gradle
       $gradleExit = $LASTEXITCODE
       Pop-Location
       if ($gradleExit -ne 0) { throw 'Gradle 构建失败 (bundleRelease)' }
@@ -366,6 +407,10 @@ try {
       Write-Info '你可以将该 AAB 上传到应用商店或使用 bundletool 进行本地生成与安装'
       Write-Info 'bundletool 参考：java -jar bundletool.jar build-apks --bundle app-release.aab --output app.apks --connected-device --mode default'
       Write-Success '全部完成 (AAB)'
+      # 导出结束后自动恢复开发配置
+      Write-Info '恢复开发配置（server.url）'
+      & node.exe scripts/prepare-release-clean-server-url.cjs --mode restore
+      if ($LASTEXITCODE -ne 0) { Write-Warn '恢复失败，请手动检查备份：scripts/.backup/capacitor.config.ts.bak' } else { Write-Success '已恢复 server.url 至构建前状态' }
     }
     default {
       throw "未知模式: $Mode"
@@ -374,5 +419,10 @@ try {
 }
 catch {
   Write-Err $_.Exception.Message
+  # 发生错误也尝试恢复
+  if ($Mode.ToLower() -in @('release','aab')) {
+    Write-Warn '构建失败，尝试恢复 server.url（备份）'
+    & node.exe scripts/prepare-release-clean-server-url.cjs --mode restore
+  }
   exit 1
 }

@@ -1,0 +1,7 @@
+println "[proxy.init.gradle] Force proxy: 127.0.0.1:20001"
+System.setProperty('http.proxyHost', '127.0.0.1')
+System.setProperty('http.proxyPort', '20001')
+System.setProperty('https.proxyHost', '127.0.0.1')
+System.setProperty('https.proxyPort', '20001')
+System.setProperty('socksProxyHost', '127.0.0.1')
+System.setProperty('socksProxyPort', '20001')

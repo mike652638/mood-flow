@@ -350,12 +350,21 @@ try {
   Write-Success 'Android 项目同步完成'
 
   # 4) 根据模式执行构建/安装
+  #   在进入 Gradle 构建前，显式设置代理到 127.0.0.1:20001，避免默认 10808 被引用
+  $proxyHost = '127.0.0.1'
+  $proxyPort = 20001
+  $env:HTTP_PROXY = "http://${proxyHost}:${proxyPort}"
+  $env:HTTPS_PROXY = "http://${proxyHost}:${proxyPort}"
+  $env:ALL_PROXY = "socks5://${proxyHost}:${proxyPort}"
+  $env:GRADLE_OPTS = "-Dhttp.proxyHost=$proxyHost -Dhttp.proxyPort=$proxyPort -Dhttps.proxyHost=$proxyHost -Dhttps.proxyPort=$proxyPort -DsocksProxyHost=$proxyHost -DsocksProxyPort=$proxyPort"
+  $env:JAVA_TOOL_OPTIONS = "-Dhttp.proxyHost=$proxyHost -Dhttp.proxyPort=$proxyPort -Dhttps.proxyHost=$proxyHost -Dhttps.proxyPort=$proxyPort -DsocksProxyHost=$proxyHost -DsocksProxyPort=$proxyPort"
   switch ($Mode.ToLower()) {
     'debug' {
       Write-Info '=== 步骤 4/4：Gradle assembleDebug 并安装 ==='
       Write-Info 'Gradle assembleDebug'
       Push-Location 'android'
-      & .\gradlew.bat assembleDebug
+      & .\gradlew.bat --stop
+      & .\gradlew.bat assembleDebug --no-daemon --init-script ..\android\proxy.init.gradle
       $gradleExit = $LASTEXITCODE
       Pop-Location
       if ($gradleExit -ne 0) { throw 'Gradle 构建失败 (Debug)' }
@@ -375,7 +384,8 @@ try {
       Write-Info '=== 步骤 4/4：Gradle assembleRelease 并安装 ==='
       Write-Info 'Gradle assembleRelease'
       Push-Location 'android'
-      & .\gradlew.bat assembleRelease
+      & .\gradlew.bat --stop
+      & .\gradlew.bat assembleRelease --no-daemon --init-script ..\android\proxy.init.gradle
       $gradleExit = $LASTEXITCODE
       Pop-Location
       if ($gradleExit -ne 0) { throw 'Gradle 构建失败 (Release)' }
@@ -411,7 +421,8 @@ try {
       Write-Info '=== 步骤 4/4：Gradle bundleRelease 并导出 AAB ==='
       Write-Info 'Gradle bundleRelease'
       Push-Location 'android'
-      & .\gradlew.bat bundleRelease
+      & .\gradlew.bat --stop
+      & .\gradlew.bat bundleRelease --no-daemon --init-script ..\android\proxy.init.gradle
       $gradleExit = $LASTEXITCODE
       Pop-Location
       if ($gradleExit -ne 0) { throw 'Gradle 构建失败 (bundleRelease)' }
