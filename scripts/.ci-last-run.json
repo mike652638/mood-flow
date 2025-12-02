@@ -1,29 +1,29 @@
 ﻿{
-    "ok":  true,
-    "tag":  "v1.4.1",
-    "branch":  "main",
-    "head_sha":  "e6e9c1d43e9b109efcc560fd89602f04d5509b3a",
-    "run_id":  18735404010,
-    "run_number":  114,
-    "status":  "completed",
-    "conclusion":  "success",
-    "html_url":  "https://github.com/mike652638/mood-flow/actions/runs/18735404010",
-    "workflow_name":  "Build Android APK",
-    "workflow_path":  ".github/workflows/build-android.yml",
-    "jobs":  [
-                 {
-                     "status":  "completed",
-                     "name":  "build-android",
-                     "conclusion":  "success"
-                 },
-                 {
-                     "status":  "completed",
-                     "name":  "publish-release",
-                     "conclusion":  "success"
-                 }
-             ],
-    "release_url":  "https://github.com/mike652638/mood-flow/releases/tag/v1.4.1",
-    "r2_apk_url":  "https://pub-0bd3064e8b4743b19a2219ed6f880902.r2.dev/releases/mood-flow-1.4.1-store-202510230219-r114-ge6e9c1d.apk",
-    "apk_release_asset_url":  null,
-    "apk_source":  "logs"
+  "ok": true,
+  "tag": "v1.5.0",
+  "branch": "main",
+  "head_sha": "029f6bf097a4b0b3b76301223b84b40f2a9daa61",
+  "run_id": 19387144587,
+  "run_number": 115,
+  "status": "completed",
+  "conclusion": "failure",
+  "html_url": "https://github.com/mike652638/mood-flow/actions/runs/19387144587",
+  "workflow_name": "Build Android APK",
+  "workflow_path": ".github/workflows/build-android.yml",
+  "jobs": [
+    {
+      "status": "completed",
+      "name": "build-android",
+      "conclusion": "failure"
+    },
+    {
+      "status": "completed",
+      "name": "publish-release",
+      "conclusion": "skipped"
+    }
+  ],
+  "release_url": "https://github.com/mike652638/mood-flow/releases/tag/v1.5.0",
+  "r2_apk_url": "https://pub-0bd3064e8b4743b19a2219ed6f880902.r2.dev/releases/mood-flow-1.4.1-store-202510230219-r114-ge6e9c1d.apk",
+  "apk_release_asset_url": null,
+  "apk_source": "logs"
 }
