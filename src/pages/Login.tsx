@@ -66,19 +66,18 @@ const Login: React.FC = () => {
   return (
     <div
       className={`min-h-screen p-4 bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 pt-safe-area-top-only ${
-        immersiveMode ? 'pt-12 sm:pt-16' : ''
-      }`}>
+        immersiveMode ? 'pt-12 sm:pt-16' : ''}`}>
       <div className='mx-auto px-4 lg:px-8 max-w-full sm:max-w-2xl lg:max-w-6xl xl:max-w-7xl 2xl:max-w-[1400px] flex items-center justify-center'>
         <div className='w-full max-w-md'>
           {/* Logo和标题 */}
-          <div className='text-center mb-8'>
-            <div className='inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-purple-500 via-purple-600 to-blue-600 dark:from-purple-600 dark:via-purple-700 dark:to-blue-700 rounded-2xl mb-6 shadow-lg shadow-purple-500/25 dark:shadow-purple-600/20'>
-              <img src='/icon-192.png' alt='心流日记' className='w-full h-full object-contain' />
+          <div className='mb-8 text-center'>
+            <div className='inline-flex justify-center items-center mb-6 w-20 h-20 bg-gradient-to-br from-purple-500 via-purple-600 to-blue-600 rounded-2xl shadow-lg dark:from-purple-600 dark:via-purple-700 dark:to-blue-700 shadow-purple-500/25 dark:shadow-purple-600/20'>
+              <img src='/icon-192.png' alt='心流日记' className='object-contain w-full h-full' />
             </div>
-            <h1 className='text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 bg-clip-text text-transparent mb-3'>
+            <h1 className='mb-3 text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400'>
               欢迎使用
             </h1>
-            <p className='text-gray-600 dark:text-gray-300 text-lg'>心流日记</p>
+            <p className='text-lg text-gray-600 dark:text-gray-300'>心流日记</p>
           </div>
 
           {/* 登录表单 */}
@@ -86,16 +85,16 @@ const Login: React.FC = () => {
             <form onSubmit={handleSubmit} className='space-y-4'>
               {/* 邮箱输入 */}
               <div>
-                <label className='block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3'>邮箱地址</label>
+                <label className='block mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300'>邮箱地址</label>
                 <div className='relative group'>
-                  <Mail className='absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500 group-focus-within:text-purple-500 dark:group-focus-within:text-purple-400 transition-colors duration-200' />
+                  <Mail className='absolute left-4 top-1/2 w-5 h-5 text-gray-400 transition-colors duration-200 transform -translate-y-1/2 dark:text-gray-500 group-focus-within:text-purple-500 dark:group-focus-within:text-purple-400' />
                   <input
                     type='email'
                     name='email'
                     value={formData.email}
                     onChange={handleInputChange}
                     placeholder='请输入邮箱地址'
-                    className='form-input w-full pl-12 pr-4 py-4 bg-white/70 dark:bg-theme-gray-700/70 border-2 border-gray-200/50 dark:border-theme-gray-600/50 rounded-2xl focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 dark:focus:border-purple-400 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200 hover:border-purple-300 dark:hover:border-purple-500'
+                    className='py-4 pr-4 pl-12 w-full placeholder-gray-500 text-gray-900 rounded-2xl border-2 transition-all duration-200 form-input bg-white/70 dark:bg-theme-gray-700/70 border-gray-200/50 dark:border-theme-gray-600/50 focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 dark:focus:border-purple-400 dark:text-gray-100 dark:placeholder-gray-400 hover:border-purple-300 dark:hover:border-purple-500'
                     required
                   />
                 </div>
@@ -103,22 +102,22 @@ const Login: React.FC = () => {
 
               {/* 密码输入 */}
               <div>
-                <label className='block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3'>密码</label>
+                <label className='block mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300'>密码</label>
                 <div className='relative group'>
-                  <Lock className='absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500 group-focus-within:text-purple-500 dark:group-focus-within:text-purple-400 transition-colors duration-200' />
+                  <Lock className='absolute left-4 top-1/2 w-5 h-5 text-gray-400 transition-colors duration-200 transform -translate-y-1/2 dark:text-gray-500 group-focus-within:text-purple-500 dark:group-focus-within:text-purple-400' />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     name='password'
                     value={formData.password}
                     onChange={handleInputChange}
                     placeholder='请输入密码'
-                    className='form-input w-full pl-12 pr-14 py-4 bg-white/70 dark:bg-theme-gray-700/70 border-2 border-gray-200/50 dark:border-theme-gray-600/50 rounded-2xl focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 dark:focus:border-purple-400 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200 hover:border-purple-300 dark:hover:border-purple-500'
+                    className='py-4 pr-14 pl-12 w-full placeholder-gray-500 text-gray-900 rounded-2xl border-2 transition-all duration-200 form-input bg-white/70 dark:bg-theme-gray-700/70 border-gray-200/50 dark:border-theme-gray-600/50 focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 dark:focus:border-purple-400 dark:text-gray-100 dark:placeholder-gray-400 hover:border-purple-300 dark:hover:border-purple-500'
                     required
                   />
                   <button
                     type='button'
                     onClick={() => setShowPassword(!showPassword)}
-                    className='absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-purple-500 dark:hover:text-purple-400 transition-colors duration-200 p-1 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20'>
+                    className='absolute right-4 top-1/2 p-1 text-gray-400 rounded-lg transition-colors duration-200 transform -translate-y-1/2 dark:text-gray-500 hover:text-purple-500 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20'>
                     {showPassword ? <EyeOff className='w-5 h-5' /> : <Eye className='w-5 h-5' />}
                   </button>
                 </div>
@@ -129,7 +128,7 @@ const Login: React.FC = () => {
                 <button
                   type='button'
                   onClick={() => navigate('/forgot-password')}
-                  className='text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline font-medium transition-colors duration-200 px-2 py-1 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20'>
+                  className='px-2 py-1 text-sm font-medium text-purple-600 rounded-lg transition-colors duration-200 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline hover:bg-purple-50 dark:hover:bg-purple-900/20'>
                   忘记密码？
                 </button>
               </div>
@@ -141,7 +140,7 @@ const Login: React.FC = () => {
                 className='btn btn-primary w-full bg-gradient-to-r from-purple-500 via-purple-600 to-blue-600 dark:from-purple-600 dark:via-purple-700 dark:to-blue-700 text-white py-4 rounded-2xl font-semibold hover:from-purple-600 hover:via-purple-700 hover:to-blue-700 dark:hover:from-purple-700 dark:hover:via-purple-800 dark:hover:to-blue-800 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 shadow-lg shadow-purple-500/25 dark:shadow-purple-600/20 hover:shadow-xl hover:shadow-purple-500/30 dark:hover:shadow-purple-600/25 transform hover:scale-[1.02] active:scale-[0.98]'>
                 {isLoading ? (
                   <>
-                    <div className='w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin' />
+                    <div className='w-5 h-5 rounded-full border-2 border-white animate-spin border-t-transparent' />
                     <span>登录中...</span>
                   </>
                 ) : (
@@ -153,7 +152,7 @@ const Login: React.FC = () => {
             {/* 分割线 */}
               <div className='flex items-center my-8'>
               <div className='flex-1 border-t border-gray-200/60 dark:border-theme-gray-600/60'></div>
-              <span className='px-6 text-sm text-gray-500 dark:text-gray-400 font-medium bg-white/50 dark:bg-theme-gray-800/50 rounded-full'>
+              <span className='px-6 text-sm font-medium text-gray-500 rounded-full dark:text-gray-400 bg-white/50 dark:bg-theme-gray-800/50'>
                 或
               </span>
               <div className='flex-1 border-t border-gray-200/60 dark:border-theme-gray-600/60'></div>
@@ -204,7 +203,7 @@ const Login: React.FC = () => {
               className='btn btn-ghost w-full bg-white/80 dark:bg-theme-gray-700/80 text-gray-700 dark:text-gray-300 py-4 rounded-2xl font-semibold border-2 border-gray-200/50 dark:border-theme-gray-600/50 hover:bg-white/95 dark:hover:bg-theme-gray-700/95 hover:border-purple-300 dark:hover:border-purple-500 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 shadow-md hover:shadow-lg transform hover:scale-[1.02] active:scale-[0.98]'>
               {isAnonymousLoading ? (
                 <>
-                  <div className='w-4 h-4 border-2 border-gray-600 dark:border-theme-gray-300 border-t-transparent rounded-full animate-spin' />
+                  <div className='w-4 h-4 rounded-full border-2 border-gray-600 animate-spin dark:border-theme-gray-300 border-t-transparent' />
                   <span>启动体验中...</span>
                 </>
               ) : (
@@ -216,23 +215,23 @@ const Login: React.FC = () => {
             </button>
 
             {/* 注册链接 */}
-            <div className='text-center mt-8'>
+            <div className='mt-8 text-center'>
               <span className='text-gray-600 dark:text-gray-400'>还没有账户？</span>
               <Link
                 to='/register'
-                className='ml-2 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-semibold transition-colors duration-200 px-3 py-1 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20'>
+                className='px-3 py-1 ml-2 font-semibold text-purple-600 rounded-lg transition-colors duration-200 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20'>
                 立即注册
               </Link>
             </div>
           </Card>
 
           {/* 底部说明 */}
-          <div className='text-center mt-8 text-sm text-gray-500 dark:text-gray-400'>
+          <div className='mt-8 text-sm text-center text-gray-500 dark:text-gray-400'>
             <p className='mb-2'>登录即表示同意我们的</p>
             <div className='space-x-3'>
               <button
                 type='button'
-                className='text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline font-medium transition-colors duration-200 px-2 py-1 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 cursor-pointer'
+                className='px-2 py-1 font-medium text-purple-600 rounded-lg transition-colors duration-200 cursor-pointer dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline hover:bg-purple-50 dark:hover:bg-purple-900/20'
                 onClick={e => {
                   e.preventDefault();
                   navigate('/terms');
@@ -242,7 +241,7 @@ const Login: React.FC = () => {
               <span>和</span>
               <button
                 type='button'
-                className='text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline font-medium transition-colors duration-200 px-2 py-1 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 cursor-pointer'
+                className='px-2 py-1 font-medium text-purple-600 rounded-lg transition-colors duration-200 cursor-pointer dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline hover:bg-purple-50 dark:hover:bg-purple-900/20'
                 onClick={e => {
                   e.preventDefault();
                   navigate('/privacy');
